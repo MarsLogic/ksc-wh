@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-09-08T15:08:42Z",
+  "decision": "PASS",
+  "packet01_cleanup_note": {
+    "path": "/home/ais/fcn300-diagnostics/evidence/cleanup-20260908T133413Z.md",
+    "sha256": "f2e4f152eb39813cc8274d99cc334e55901abfe4a53f69f9a2bf8fe7c0779586"
+  },
+  "document": {
+    "path": "/home/ais/fcn300-diagnostics/docs/register-research.md",
+    "packet01_sha256": "5edac430ad0b6d959ce47d695d6fcb6a091da7fcec16c8a4ed353130e1d0e34b",
+    "current_sha256": "504a2b06002a6ef0fcd6049f1d08e3171996995d72cfd98dca1821dbe174bee0",
+    "exact_change": "Nine final lines appended: one blank separator plus section 6, Energy stakeout verdict. Removing those nine lines reproduces the Packet 01 hash.",
+    "classification": "benign evidence-supported append; no earlier line changed"
+  },
+  "energy_watch": {
+    "path": "/home/ais/fcn300-diagnostics/evidence/energy-watch.csv",
+    "sha256": "379adbf571553ec83fdf951d8b421ac6fad41bac427d226664e1eb14c4189fb7",
+    "samples": 37,
+    "first_timestamp": "2026-09-08T11:33:08",
+    "last_timestamp": "2026-09-08T14:33:09",
+    "unique_0x0210_0x0217_vectors": 1,
+    "verdict": "REJECTED_FOR_PROMOTION_AS_LIVE_TOTAL_KWH; actual semantics UNKNOWN"
+  },
+  "diagnostic_process": {
+    "pid": 21436,
+    "command": "python3 app.py",
+    "cwd": "/home/ais/fcn300-diagnostics",
+    "started": "2026-09-08T13:34:54Z",
+    "parent_at_reconciliation": {
+      "pid": 5399,
+      "command": "/home/ais/.bun/bin/bun /home/ais/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js __omp_worker_daemon_broker"
+    },
+    "listen": "0.0.0.0:8090",
+    "owns_serial": false,
+    "classification": "benign relaunch of cleaned Packet 01 diagnostic application"
+  },
+  "diagnostic_hashes": {
+    "app.py": "b2574b4a14ebb68bd3786cb5cef1675f4be9f1fc982764bec02954b3e3de4a39",
+    "decoder.py": "696c09135ab598b7fac0cf040ab5cfdd730381506e33c5e549e2cda56ee4f1ff",
+    "register_map.py": "0837760b0c502ea25a5ddd7a0514639edf63c0f95be5c568990e9f88cf6e937a",
+    "static/app.js": "cf864622c133fa20bf6b97604f9a0f129082498021b7295a40278d239388b148",
+    "static/style.css": "2bbbc5a180f9759193f1cd34610e143de5558fbf99e13c81d42b23519738f5e7"
+  },
+  "production_before_packet03_deployment": {
+    "pid": 21238,
+    "source_sha256": "9c38a9a892e1cf4ba23b09a1a2176f935c42168f1036be6ca915a0cc746e4d85",
+    "serial_device": "/dev/ttyUSB0",
+    "sole_serial_owner": true,
+    "voltage_mapping": "FC03 0x0042 count 6 BE-u32/10000",
+    "current_mapping": "FC03 0x0058 count 8 BE-u32/10000",
+    "unresolved_quantities": ["frequency", "P", "Q", "S", "PF", "energy"]
+  },
+  "packet03_temporary_state": {
+    "deployed_at": "2026-09-08T15:19:25Z",
+    "production_pid": 28181,
+    "source_sha256": "4ae40bfe80e14054294b85e257bcbaa4acf76d0344e82ab4be2663d30f404bcb",
+    "sole_serial_owner": true,
+    "validated_vi_unchanged": true,
+    "unresolved_quantities_remain_unknown": true
+  }
+}

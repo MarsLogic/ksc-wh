@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "recomputed_at": "2026-09-08T15:08:42Z",
+  "method": "Raw 16-bit words were treated as authoritative. Adjacent pairs were recomputed as big-endian unsigned and signed 32-bit integers before applying only natural decimal scales. Transcribed decoded_value columns were not trusted.",
+  "inputs": [
+    {"file": "sweep1.json", "sha256": "94017355cf40499bc6797b4576073ff6eacd9adab1bfc370cc96bf2983c5ca09"},
+    {"file": "sweep2.json", "sha256": "1252887ae45cd4e0ce4737150b305762b71d8a7856cabbe01ce425d3e8b2492f"},
+    {"file": "e1a.json", "sha256": "c7bd8c302c24aabd0afad5ee84bb9ad7e00d13a92d330c80c262832d8fee4db5"},
+    {"file": "e1b.json", "sha256": "c4463da8620eae0b70b2aab6bf438758452eb1fd727705fb33f4cb2ed4f1b099"},
+    {"file": "e2a.json", "sha256": "e0882ff19096f872431b560dddb2233a34e2e27102fb08ee9e44d8e5caf72537"},
+    {"file": "e2b.json", "sha256": "213f0e69e3d71ae3592648f0da4a2efcc06781a451bbe3e9f84f6c9ba5d86776"},
+    {"file": "diag-pre-cutover.json", "sha256": "7a8a8b4ae4e88421917a2a655aa3b10d2f5f2293eef44925d9caf981d35d0978"},
+    {"file": "register-observations.csv", "sha256": "9e64180350633d004a53db56d1f3b6d4251fb58ab39bb94e07872152764e25e1"},
+    {"file": "energy-watch.csv", "sha256": "379adbf571553ec83fdf951d8b421ac6fad41bac427d226664e1eb14c4189fb7"}
+  ],
+  "findings": [
+    {
+      "region": "0x0040-0x0041",
+      "result": "NO_EVIDENCE",
+      "detail": "None of the supplied raw captures contains the complete pair. New bounded acquisition and an independent frequency reference are required."
+    },
+    {
+      "region": "0x0064-0x0069",
+      "result": "ACTIVE_POWER_HYPOTHESIS_UNRESOLVED",
+      "detail": "At 11:19:44 the three BE-u32/10000 values recompute to 19.616, 21.736 and 20.724 (sum 62.076). This is power-like but has no same-time kW reference, and 0x006A-0x006B was not captured. At the later low-load snapshot the first two pairs were zero and 0x0068 was 0.592, also compatible with a phase-power hypothesis but not proof."
+    },
+    {
+      "region": "0x0064 and 0x0066 CSV rows",
+      "result": "DISPUTED_TRANSCRIPTION",
+      "detail": "Raw words 2/36568 and 2/55888 are authoritative. They recompute to BE-u32 values 167640 and 186960; divided by the rejected fitted divisor 1790 they are 93.6536 and 104.4469, not the CSV values 93.40 and 142.74. The rows remain evidence of raw words only."
+    },
+    {
+      "region": "0x006A-0x006F",
+      "result": "NO_EVIDENCE",
+      "detail": "No supplied capture contains these complete words. They may contain an active-power aggregate or family continuation."
+    },
+    {
+      "region": "0x0070-0x0075",
+      "result": "REJECTED_AS_CURRENT_OTHER_MEANING_UNKNOWN",
+      "detail": "Across existing captures BE-i32/10000 varies materially. At 11:19:44 it recomputes to 15.816, 20.852 and 27.492; at the later low-load snapshot it was -0.24, -0.24 and 0. This supports retaining signed interpretations but does not uniquely identify Q, S or another quantity. The phase-current interpretation remains rejected."
+    },
+    {
+      "region": "0x0076-0x008B",
+      "result": "NO_EVIDENCE",
+      "detail": "No supplied raw capture adequately covers these words. Bounded acquisition is required to test aggregate Q, apparent power and PF family hypotheses."
+    },
+    {
+      "region": "0x0210-0x0217",
+      "result": "REJECTED_FOR_PROMOTION_AS_LIVE_TOTAL_KWH",
+      "detail": "All eight words are identical in all 37 observations from 11:33:08 through 14:33:09 UTC. The four BE-u32/1e6 renderings remain 1050.0848, 1050.1759, 1050.1262 and 1051.1324 while the recorded natural load changed. Actual semantics remain UNKNOWN; alternate scaling cannot rescue a static live-energy candidate."
+    }
+  ],
+  "eliminations": [
+    "Legacy 0x001A/0x0020/0x0022/0x0024/0x0026 values are static/config-like and cannot serve as frequency or power references.",
+    "0x0064/0x0066/0x0068 divided by 1790 is not an admissible current mapping because the divisor was fitted and the CSV contains conflicting decimal transcription.",
+    "0x0070-0x0075 is not phase current.",
+    "0x0210-0x0217 is not promotable as live total kWh."
+  ],
+  "quantities": {
+    "frequency": "UNKNOWN",
+    "active_power_P": "UNKNOWN",
+    "reactive_power_Q": "UNKNOWN",
+    "apparent_power_S": "UNKNOWN",
+    "power_factor_PF": "UNKNOWN",
+    "energy": "OUT_OF_SCOPE"
+  }
+}

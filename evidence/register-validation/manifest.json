@@ -1,0 +1,129 @@
+{
+  "collection": "Packet 03 rerun, plateau-gated (raw evidence only; no inference, promotion, or mapping claims)",
+  "collector_host": "ais@100.73.124.7",
+  "collector_method": "loopback HTTP only; serial device never opened; no serial library; no Modbus client; no restarts; no service/file/meter changes; no load actuation; natural load only",
+  "endpoints": [
+    "http://127.0.0.1:8080/",
+    "http://127.0.0.1:8080/diag/raw"
+  ],
+  "evidence_dir": "/home/ais/fcn300-diagnostics/evidence/packet03-rerun-20260908T155724Z",
+  "target_windows": [
+    [
+      "0x0064",
+      8
+    ],
+    [
+      "0x006C",
+      4
+    ],
+    [
+      "0x0070",
+      8
+    ],
+    [
+      "0x0078",
+      4
+    ],
+    [
+      "0x007C",
+      8
+    ]
+  ],
+  "skipped_windows_recorded_compact": [
+    [
+      "0x0040",
+      2
+    ],
+    [
+      "0x0084",
+      8
+    ]
+  ],
+  "function_code": 3,
+  "gate": "Run began only after operator confirmed a timestamped panel reference could be supplied during the run (nontrivial load 8.9/0.0/11.7 A observed at setup).",
+  "production": {
+    "service": "ais-energy.service",
+    "main_pid": 28181,
+    "service_start_utc": "2026-09-08T15:19:25Z",
+    "service_start_monotonic": "24830722739",
+    "nrestarts_baseline": "0",
+    "source_sha256_operator_stated": "4ae40bfe80e14054294b85e257bcbaa4acf76d0344e82ab4be2663d30f404bcb",
+    "source_sha256_verification": "NOT independently verified (production file not read per constraints)"
+  },
+  "ownership_method": "systemctl MainPID/ActiveState/NRestarts/ActiveEnterTimestampMonotonic + /proc/<MainPID> existence + fd symlink rdev scan over /proc/[0-9]*/fd; fuser recorded informational only. Empty/permission-error/disappearing-entry/timeout = INCONCLUSIVE with up to 3 one-second retries; never treated as loss.",
+  "ownership_outcome": "All external checks INCONCLUSIVE on full-scan step (144 eacces skips, inherent to unprivileged scan) with service identity stable throughout (pid 28181, active, NRestarts 0, timestamp unchanged); sole-owner fuser reads and advancing candidate sequences corroborate continuity. No ownership stop triggered.",
+  "plateau_rule": "Nontrivial = usable-attempt mean(current_a,current_b,current_c) >= 5.0 A (idle reference 0/0/2.77 A, mean ~0.9 A). Stable = consecutive usable attempts. Completion needed all five targets x2 usable inside one stable nontrivial run plus bracketing panel references. Six-minute gate: continue past 360 s only with nontrivial load seen AND >=1 reference; else INSUFFICIENT.",
+  "panel_reference": {
+    "count": 0,
+    "path": null,
+    "note": "No operator readings arrived during the run despite the pre-run confirmation; file not created. This alone forces INSUFFICIENT regardless of load."
+  },
+  "preserved_manifest_sources": [
+    {
+      "path": "/home/ais/fcn300-diagnostics/evidence/discovery-allowlist.json",
+      "sha256": "928a64c309736f1308e202ba9c68195b9ea7f0adbab92c91bb75c673ee9247bc"
+    },
+    {
+      "path": "/home/ais/fcn300-diagnostics/evidence/existing-evidence-reanalysis.json",
+      "sha256": "2c6993ac46ccb8b6ac08ee6d61d3e1af2a285ed7b0a662ea4682b415d343cb4b"
+    },
+    {
+      "path": "/home/ais/fcn300-diagnostics/evidence/reconciled-baseline-20260908T150842Z.json",
+      "sha256": "c56e0353a8d03fcb7b3d38f4f9e40cd4268222ba096fdf25d9b3f321f4ae9117"
+    }
+  ],
+  "stats": {
+    "attempts": 73,
+    "retained": 53,
+    "skipped_compact": 18,
+    "unusable_genuine": 0,
+    "internal_owner_hook_failures": 2,
+    "stop_reason": "INSUFFICIENT: no materially different natural load or no panel reference by six minutes",
+    "session_id": "2026-09-08T15:19:25Z-pid-28181",
+    "sequence_min": 2848,
+    "sequence_max": 3250,
+    "per_target_retained_counts": {
+      "0x0064+8": 11,
+      "0x006C+4": 11,
+      "0x0070+8": 9,
+      "0x0078+4": 11,
+      "0x007C+8": 11
+    },
+    "plateau_mean_a": {
+      "min": 6.869,
+      "max": 7.445,
+      "note": "stable nontrivial plateau present entire window; bracketing references absent"
+    },
+    "first_client_utc": "2026-09-08T16:01:16.171Z",
+    "last_client_utc": "2026-09-08T16:07:16.176Z"
+  },
+  "defects_disclosed": [
+    "Collector referenced an undefined internal owner helper on attempts 1 and 13 (every-12th internal check); those attempts recorded exceptions. Ownership was verified externally at the same cadence instead; all external checks stable-identity/INCONCLUSIVE-scan.",
+    "Collector crashed in its finally block on the same defect after the loop broke, so collector-summary.json was computed post-hoc from flushed raw lines (untouched)."
+  ],
+  "written_files": {
+    "samples.jsonl": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-rerun-20260908T155724Z/samples.jsonl",
+      "sha256": "a111049d323f4c5ccaddff7833e59ea8eeb65c706e6ecb157cc9839c8f422b92",
+      "lines": 73
+    },
+    "skipped-windows.jsonl": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-rerun-20260908T155724Z/skipped-windows.jsonl",
+      "sha256": "8f25886ef8a1ad2611586a76750cea991c99b130009df9f32632b1d273b93edf",
+      "lines": 20
+    },
+    "collector-summary.json": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-rerun-20260908T155724Z/collector-summary.json",
+      "sha256": "002ff9218df9a31a612cd8d2a6748fb7f419a61d8dc43c39481fbcf42c207635"
+    },
+    "ownership-checks.jsonl": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-rerun-20260908T155724Z/ownership-checks.jsonl",
+      "sha256": "db58fe7aa6a64626b9e39976bee8ec41183bc7dd7966d08577ef5031288c8cd9",
+      "lines": 8
+    },
+    "manifest.json": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-rerun-20260908T155724Z/manifest.json",
+      "integrity_note": "Self hash omitted by construction; final file hash reported in the collection report."
+    }
+  }
+}

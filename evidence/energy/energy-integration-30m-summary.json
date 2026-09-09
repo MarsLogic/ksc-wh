@@ -1,0 +1,158 @@
+{
+  "attempts": 360,
+  "http_failures": 0,
+  "stale_invalid_vi": 0,
+  "power": 185,
+  "energy": 175,
+  "session_ids": [
+    "2026-09-09T04:25:10Z-pid-58562"
+  ],
+  "sequence_min": 1904,
+  "sequence_max": 3849,
+  "first_attempt_utc": "2026-09-09T04:54:29.072338Z",
+  "last_attempt_utc": "2026-09-09T05:24:24.077349Z",
+  "raw_per_address": {
+    "0x008C": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x008D": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x008E": {
+      "first": 18813,
+      "last": 18816,
+      "min": 18813,
+      "max": 18816,
+      "change_count": 3
+    },
+    "0x008F": {
+      "first": 10112,
+      "last": 64512,
+      "min": 0,
+      "max": 65280,
+      "change_count": 174
+    },
+    "0x0090": {
+      "first": 18258,
+      "last": 18258,
+      "min": 18258,
+      "max": 18258,
+      "change_count": 0
+    },
+    "0x0091": {
+      "first": 10240,
+      "last": 10240,
+      "min": 10240,
+      "max": 10240,
+      "change_count": 0
+    },
+    "0x0092": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x0093": {
+      "first": 45322,
+      "last": 46124,
+      "min": 45322,
+      "max": 46124,
+      "change_count": 174
+    },
+    "0x0094": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x0095": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x0096": {
+      "first": 18909,
+      "last": 18913,
+      "min": 18909,
+      "max": 18913,
+      "change_count": 4
+    },
+    "0x0097": {
+      "first": 19584,
+      "last": 14080,
+      "min": 128,
+      "max": 64704,
+      "change_count": 174
+    },
+    "0x0064": {
+      "first": 2,
+      "last": 2,
+      "min": 1,
+      "max": 2,
+      "change_count": 4
+    },
+    "0x0065": {
+      "first": 35088,
+      "last": 34128,
+      "min": 648,
+      "max": 65264,
+      "change_count": 178
+    },
+    "0x0066": {
+      "first": 2,
+      "last": 2,
+      "min": 2,
+      "max": 3,
+      "change_count": 10
+    },
+    "0x0067": {
+      "first": 53048,
+      "last": 53008,
+      "min": 112,
+      "max": 61288,
+      "change_count": 180
+    },
+    "0x0068": {
+      "first": 2,
+      "last": 2,
+      "min": 1,
+      "max": 2,
+      "change_count": 2
+    },
+    "0x0069": {
+      "first": 33728,
+      "last": 32008,
+      "min": 88,
+      "max": 63824,
+      "change_count": 181
+    },
+    "0x006A": {
+      "first": 7,
+      "last": 7,
+      "min": 6,
+      "max": 8,
+      "change_count": 23
+    },
+    "0x006B": {
+      "first": 56408,
+      "last": 53808,
+      "min": 912,
+      "max": 65328,
+      "change_count": 184
+    }
+  },
+  "quality_failures": [],
+  "stop_reason": "maximum attempts"
+}

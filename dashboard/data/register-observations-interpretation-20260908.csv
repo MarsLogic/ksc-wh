@@ -1,0 +1,7 @@
+source_rows,quantity,production_interpretation,status,note
+2-4,Voltage A/B/C,"FC03 0x0042 count 6; BE-u32 /10000",VALIDATED,"Atomic block; no correction"
+5-8,Current A/B/C/average,"FC03 0x0058 count 8; BE-u32 /10000",VALIDATED,"Canonical production current quad; no correction"
+12-14,Rejected current candidate,"0x0070-0x0075",REJECTED,"Retained as evidence only; must not populate Current A/B/C"
+9-11,Line-to-line candidates,"0x004C-0x0053 BE-u32 /10000",UNRESOLVED,"Candidate assignment is not production validated"
+15-17,H2 current candidates,"0x0064-0x0069 with fitted divisor",REJECTED_FOR_PRODUCTION,"Fitted divisor is unattested"
+all,Frequency/P/Q/S/PF/kWh/kvarh/kVAh,"No validated production mapping",UNKNOWN,"Expose null and omit from persistence"

@@ -1,0 +1,158 @@
+{
+  "attempts": 42,
+  "http_failures": 0,
+  "stale_invalid_vi": 0,
+  "power": 21,
+  "energy": 21,
+  "session_ids": [
+    "2026-09-09T04:25:10Z-pid-58562"
+  ],
+  "sequence_min": 265,
+  "sequence_max": 488,
+  "first_attempt_utc": "2026-09-09T04:29:15.890500Z",
+  "last_attempt_utc": "2026-09-09T04:32:40.892995Z",
+  "raw_per_address": {
+    "0x0064": {
+      "first": 2,
+      "last": 2,
+      "min": 2,
+      "max": 2,
+      "change_count": 0
+    },
+    "0x0065": {
+      "first": 39928,
+      "last": 37688,
+      "min": 36408,
+      "max": 46968,
+      "change_count": 20
+    },
+    "0x0066": {
+      "first": 2,
+      "last": 3,
+      "min": 2,
+      "max": 3,
+      "change_count": 1
+    },
+    "0x0067": {
+      "first": 57848,
+      "last": 12272,
+      "min": 9472,
+      "max": 59248,
+      "change_count": 20
+    },
+    "0x0068": {
+      "first": 2,
+      "last": 2,
+      "min": 2,
+      "max": 2,
+      "change_count": 0
+    },
+    "0x0069": {
+      "first": 38408,
+      "last": 36648,
+      "min": 35328,
+      "max": 39848,
+      "change_count": 20
+    },
+    "0x006A": {
+      "first": 8,
+      "last": 8,
+      "min": 7,
+      "max": 8,
+      "change_count": 6
+    },
+    "0x006B": {
+      "first": 5232,
+      "last": 20832,
+      "min": 72,
+      "max": 65328,
+      "change_count": 20
+    },
+    "0x008C": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x008D": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x008E": {
+      "first": 18808,
+      "last": 18809,
+      "min": 18808,
+      "max": 18809,
+      "change_count": 1
+    },
+    "0x008F": {
+      "first": 60672,
+      "last": 31616,
+      "min": 2176,
+      "max": 64512,
+      "change_count": 20
+    },
+    "0x0090": {
+      "first": 18258,
+      "last": 18258,
+      "min": 18258,
+      "max": 18258,
+      "change_count": 0
+    },
+    "0x0091": {
+      "first": 10240,
+      "last": 10240,
+      "min": 10240,
+      "max": 10240,
+      "change_count": 0
+    },
+    "0x0092": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x0093": {
+      "first": 44636,
+      "last": 44728,
+      "min": 44636,
+      "max": 44728,
+      "change_count": 20
+    },
+    "0x0094": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x0095": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0,
+      "change_count": 0
+    },
+    "0x0096": {
+      "first": 18905,
+      "last": 18906,
+      "min": 18905,
+      "max": 18906,
+      "change_count": 1
+    },
+    "0x0097": {
+      "first": 62208,
+      "last": 26112,
+      "min": 2112,
+      "max": 65088,
+      "change_count": 20
+    }
+  },
+  "quality_failures": [],
+  "stop_reason": "early sufficient-change/carry criterion"
+}

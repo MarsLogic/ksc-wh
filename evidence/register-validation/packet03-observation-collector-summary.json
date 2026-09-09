@@ -1,0 +1,72 @@
+{
+  "attempts": 13,
+  "usable": 13,
+  "unusable": 0,
+  "stop_reason": "production lost sole serial ownership",
+  "session_id": "2026-09-08T15:19:25Z-pid-28181",
+  "sequence_min": 1024,
+  "sequence_max": 1158,
+  "per_block_usable_counts": {
+    "0x0064+8": 2,
+    "0x0070+8": 2,
+    "0x006C+4": 3,
+    "0x0040+2": 1,
+    "0x0084+8": 2,
+    "0x007C+8": 2,
+    "0x0078+4": 1
+  },
+  "vi_ranges": {
+    "voltage_l1": {
+      "min": 235.1668,
+      "max": 235.1668,
+      "n": 13
+    },
+    "voltage_l2": {
+      "min": 236.5931,
+      "max": 236.5931,
+      "n": 13
+    },
+    "voltage_l3": {
+      "min": 235.3836,
+      "max": 235.7537,
+      "n": 13
+    },
+    "current_a": {
+      "min": 0.0,
+      "max": 0.0,
+      "n": 13
+    },
+    "current_b": {
+      "min": 0.0,
+      "max": 0.0,
+      "n": 13
+    },
+    "current_c": {
+      "min": 2.736,
+      "max": 2.8,
+      "n": 13
+    }
+  },
+  "first_client_utc": "2026-09-08T15:34:30.554Z",
+  "last_client_utc": "2026-09-08T15:36:28.740Z",
+  "first_source_utc": "2026-09-08T15:34:30",
+  "last_source_utc": "2026-09-08T15:36:27",
+  "owner_baseline": [
+    "28181"
+  ],
+  "owner_final": [],
+  "owner_checks": [
+    {
+      "attempt": 1,
+      "pids": [],
+      "match": false
+    },
+    {
+      "attempt": 13,
+      "pids": [],
+      "returncode": 0,
+      "match": false
+    }
+  ],
+  "panel_reference_count": 0
+}

@@ -1,0 +1,26 @@
+timestamp,function_code,decimal_address,hex_address,raw_word_1,raw_word_2,raw_bytes,interpretation,decoded_value,unit,classification,evidence
+2026-09-08T10:05Z,3,66,0x0042,35,13676,0023356C,BE-u32/10000 phase A voltage,230.74,V,CONFIRMED,0.28% vs field 230.1
+2026-09-08T10:05Z,3,68,0x0044,35,16806,002341A6,BE-u32/10000 phase B voltage,231.06,V,CONFIRMED,0.33% vs field 230.3
+2026-09-08T10:05Z,3,70,0x0046,35,11963,00232EBB,BE-u32/10000 phase C voltage,230.57,V,CONFIRMED,0.29% vs field 229.9
+2026-09-08T10:33Z,3,88,0x0058,14,62336,000EF340,BE-u32/10000 phase A current,97.98,A,HIGH,avg-identity 0.06% mean over 14 samples
+2026-09-08T10:33Z,3,90,0x005A,18,1712,001206B0,BE-u32/10000 phase B current,118.14,A,HIGH,B-highest 14/14 samples
+2026-09-08T10:33Z,3,92,0x005C,14,60496,000EEC50,BE-u32/10000 phase C current,97.80,A,HIGH,A~=C throughout
+2026-09-08T10:33Z,3,94,0x005E,15,60613,000FCCD5,BE-u32/10000 average current,104.37,A,HIGH,mean(A B C) within 0.35% twice
+2026-09-08T10:33Z,3,100,0x0064,2,36568,00028ED8,BE-u32 fitted /1790 phase A cross-check,93.40,A,HYPOTHESIS,divisor unattested; <1% twice
+2026-09-08T10:33Z,3,102,0x0066,2,55888,0002DA50,BE-u32 fitted /1790 phase B cross-check,142.74,A,HYPOTHESIS,pattern-perfect; divisor unattested
+2026-09-08T10:05Z,3,76,0x004C,61,1611,003D064B,BE-u32/10000 line-to-line,399.93,V,MEDIUM,vs 398.5 derived; assignment pending; torn spikes +-2%
+2026-09-08T10:05Z,3,112,0x0070,2,9208,000223F8,BE-i32/10000 NOT phase current,14.03,A,REJECTED,-85% vs field; no rescale fixes triple
+2026-09-03T08:22Z,3,0,0x0000,8888,0,,u16 x0.02636 ex-voltage L1,234.29,V,REJECTED,bit-identical Sep3-Sep8 frozen meter-side
+2026-09-03T08:22Z,3,6,0x0006,33281,3000,,u16 x0.002554 ex-current A,85.00,A,REJECTED,frozen; aliasing 0x02=0x12 0x0E=0x16
+2026-09-08T10:00Z,3,83,0x0053,65254,,,single x0.01 ex-energy,899.41,kWh,REJECTED,L-L low-word; +21kWh/2min impossible
+2026-09-08T10:58Z,4,66,0x0042,35,13676,0023356C,FC04 mirror of voltage A,230.74,V,SUPPORTED,FC04 answers; mirrors FC03 within drift
+2026-09-08T10:58Z,4,88,0x0058,12,34128,000C8550,FC04 mirror of current A,82.06,A,SUPPORTED,same ballpark; load drifts between polls
+2026-09-08T10:09Z,3,528,0x0210,16023,1467,3E9705BB,BE-u32/1e6 energy-class cluster,1050.08,kWh,HYPOTHESIS,static 65s; -0.48% vs 1055.20
+2026-09-08T10:09Z,3,140,0x008C,0,0,,empty/unused,0,,STATIC,zero both samples
+2026-09-08T10:20Z,3,142,0x008E,18756,51584,,BE-u32 monotonic counter class,1229.24,,HYPOTHESIS,+15360/60s rollover-consistent; unit unresolved
+2026-09-08T10:21Z,3,554,0x022A,138,16132,,CDAB/1e6 single-sample coincidence,1057.23,kWh,REJECTED,teleported to 1769.5 in 60 s
+2026-09-08T10:21Z,3,556,0x022C,14,52721,,BE/10000 single-sample coincidence,97.02,A,REJECTED,teleported to 1706.5 in 60 s
+2026-09-08T10:09Z,3,256,0x0100,65535,63193,,BE-i32 fast mover,-2343,,OSCILLATING,bidirectional thousands/60s; not a counter
+2026-09-08T10:09Z,3,27,0x001B,5000,,,config-like static mate,5000,,STATIC,part of 5000/6000/3000 static family
+2026-09-08T10:09Z,3,39,0x0027,257,,,config-like static,257,,STATIC,production PF raw region; scale unattested
+2026-09-08T10:33Z,3,56,0x0038,1063,519,,static unknown pair,1063/519,,STATIC,identical across 45 s; not live power

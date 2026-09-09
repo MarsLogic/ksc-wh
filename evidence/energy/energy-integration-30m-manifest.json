@@ -1,0 +1,14 @@
+{
+  "method": "loopback HTTP only: GET / and GET /diag/raw",
+  "serial_access": false,
+  "limits": {
+    "interval_seconds": 5.0,
+    "maximum_seconds": 1800.0,
+    "maximum_attempts": 360
+  },
+  "stop_reason": "maximum attempts",
+  "hashes_sha256": {
+    "samples.jsonl": "ee160b65e925b6f3640a01b0fbc453167541734315d0169f47a86426536724ad",
+    "summary.json": "7dd2dccb16644b780e03b498b815f23019047cfcaa850a5436a3ae2d336be017"
+  }
+}

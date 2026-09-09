@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-08T15:08:42Z",
+  "task": "Packet 03 preflight for frequency, P, Q, S and PF",
+  "status": "temporary_acquisition_prepared",
+  "source": {
+    "path": "/home/ais/ais-energy/fcn300_api.py",
+    "prechange_sha256": "9c38a9a892e1cf4ba23b09a1a2176f935c42168f1036be6ca915a0cc746e4d85",
+    "temporary_sha256": "4ae40bfe80e14054294b85e257bcbaa4acf76d0344e82ab4be2663d30f404bcb",
+    "validated_voltage": {"fc": 3, "start": "0x0042", "count": 6, "decode": "BE-u32/10000"},
+    "validated_current": {"fc": 3, "start": "0x0058", "count": 8, "decode": "BE-u32/10000"}
+  },
+  "enabled_blocks": [
+    {
+      "start": "0x0040", "count": 2,
+      "hypotheses": ["frequency or frequency-adjacent aggregate"],
+      "why_new_data": "No existing raw capture contains both 0x0040 and 0x0041. Independent panel frequency is required."
+    },
+    {
+      "start": "0x0064", "count": 8,
+      "hypotheses": ["phase active power P", "active-power aggregate at 0x006A"],
+      "why_new_data": "0x0064-0x0069 varies with load, but earlier /1790 current fitting is rejected, CSV decimals conflict with its raw words, 0x006A-0x006B is missing, and no same-time kW reference exists."
+    },
+    {
+      "start": "0x006C", "count": 4,
+      "hypotheses": ["active-power continuation or aggregate", "boundary between P and Q families"],
+      "why_new_data": "No raw evidence exists; these words complete the contiguous 0x0064-0x006F candidate family."
+    },
+    {
+      "start": "0x0070", "count": 8,
+      "hypotheses": ["phase reactive power Q", "reactive-power aggregate at 0x0076"],
+      "why_new_data": "0x0070-0x0075 is conclusively not phase current but remains untested as Q; 0x0076-0x0077 and same-time kvar references are absent."
+    },
+    {
+      "start": "0x0078", "count": 4,
+      "hypotheses": ["reactive-power continuation or aggregate", "boundary between Q and S families"],
+      "why_new_data": "No raw evidence exists; these words complete the contiguous 0x0070-0x007B candidate family."
+    },
+    {
+      "start": "0x007C", "count": 8,
+      "hypotheses": ["phase and total apparent power S"],
+      "why_new_data": "No existing capture covers this window; arithmetic kVA anchors are constraints rather than meter references."
+    },
+    {
+      "start": "0x0084", "count": 8,
+      "hypotheses": ["phase and total power factor PF"],
+      "why_new_data": "No existing capture covers this window and no same-time PF reference exists."
+    }
+  ],
+  "disabled_blocks": [
+    {
+      "start": "0x0060", "count": 4,
+      "reason": "Adjacent to the validated current family but no specific frequency/P/Q/S/PF hypothesis is supported. Current and average current are already validated through 0x005F, so this window adds traffic without closing an objective evidence gap."
+    }
+  ],
+  "required_interpretations": {
+    "pairwise": ["BE-u32", "BE-i32", "word-swapped-u32", "word-swapped-i32", "IEEE754-ABCD", "IEEE754-CDAB"],
+    "single_word_when_structurally_indicated": ["u16", "i16"],
+    "decimal_scales": [1, 10, 100, 1000, 10000],
+    "constraints": ["no fitted divisor", "abs(P)<=S", "abs(PF)<=1", "compare P/S only for matched definitions and timestamps", "preserve signed import/export and inductive/capacitive semantics"]
+  },
+  "acquisition": {
+    "function_code": 3,
+    "serial_owner": "ais-energy.service only",
+    "blocks_per_production_pass": 1,
+    "optional_block_retries": 1,
+    "individual_word_fallback": false,
+    "diagnostic_transaction_budget": "approximately 1 second maximum per pass",
+    "collector_interval_seconds_minimum": 5,
+    "collector_max_attempts": 240,
+    "collector_max_duration_minutes": 20,
+    "provenance_fields": ["attempt_timestamp", "source_timestamp", "completed_timestamp", "session_id", "sequence", "function_code", "start", "count", "elapsed_ms", "ok", "coherent"]
+  },
+  "stop_conditions": [
+    "five consecutive collector samples with stale/invalid V/I or no usable candidate block",
+    "validated V/I age exceeds five seconds",
+    "production loses sole ownership of /dev/ttyUSB0",
+    "an optional transaction exceeds the approximately one-second budget repeatedly",
+    "any meter exception suggests the allowlist is unsupported",
+    "20 minutes or 240 attempts, whichever occurs first"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "attempts": 73,
+  "retained": 53,
+  "skipped_windows": 20,
+  "usable": 53,
+  "unusable_genuine": 0,
+  "internal_owner_hook_failures": 7,
+  "stop_reason": "INSUFFICIENT: no materially different natural load or no panel reference by six minutes",
+  "stop_detail": "Loop broke at the six-minute gate (73 attempts, 360 s): panel-reference file empty (no operator readings supplied during the run), so completion was impossible. No mapping action taken.",
+  "session_ids_sorted": [
+    "2026-09-08T15:19:25Z-pid-28181"
+  ],
+  "sequence_min": 2848,
+  "sequence_max": 3250,
+  "per_target_retained_counts": {
+    "0x007C+8": 11,
+    "0x0078+4": 11,
+    "0x006C+4": 11,
+    "0x0064+8": 11,
+    "0x0070+8": 9
+  },
+  "plateau_mean_a_overall": {
+    "min": 6.869,
+    "max": 7.445,
+    "n": 73
+  },
+  "plateau_note": "Mean current held ~6.88 A (nontrivial vs 0/0/2.77 A idle) with a brief ~7.44 A excursion; stability present but bracketing references absent.",
+  "vi_ranges": {
+    "voltage_l1": {
+      "min": 235.904,
+      "max": 236.2726,
+      "n": 53
+    },
+    "voltage_l2": {
+      "min": 237.7004,
+      "max": 238.0695,
+      "n": 53
+    },
+    "voltage_l3": {
+      "min": 236.4939,
+      "max": 236.864,
+      "n": 53
+    },
+    "current_a": {
+      "min": 8.94,
+      "max": 8.976,
+      "n": 53
+    },
+    "current_b": {
+      "min": 0.0,
+      "max": 0.0,
+      "n": 53
+    },
+    "current_c": {
+      "min": 11.668,
+      "max": 13.396,
+      "n": 53
+    }
+  },
+  "first_client_utc": "2026-09-08T16:01:16.171Z",
+  "last_client_utc": "2026-09-08T16:07:16.176Z",
+  "panel_reference_count": 0,
+  "producer_note": "collector-summary.json computed post-hoc from samples.jsonl lines (collector crashed in its finally block on the same missing owner helper before writing its own summary; raw lines were already flushed and are untouched)"
+}

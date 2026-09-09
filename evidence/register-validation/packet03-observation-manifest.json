@@ -1,0 +1,193 @@
+{
+  "collection": "Packet 03 observation (raw evidence only; no inference, decoding, ranking, or promotion)",
+  "collector_host": "ais@100.73.124.7",
+  "collector_method": "loopback HTTP only; serial device never opened; no serial library; no Modbus client; no restarts; no file changes except this evidence directory; no load actuation",
+  "endpoints": [
+    "http://127.0.0.1:8080/",
+    "http://127.0.0.1:8080/diag/raw"
+  ],
+  "evidence_dir": "/home/ais/fcn300-diagnostics/evidence/packet03-observation-20260908T153406Z",
+  "enabled_windows": [
+    [
+      "0x0040",
+      2
+    ],
+    [
+      "0x0064",
+      8
+    ],
+    [
+      "0x006C",
+      4
+    ],
+    [
+      "0x0070",
+      8
+    ],
+    [
+      "0x0078",
+      4
+    ],
+    [
+      "0x007C",
+      8
+    ],
+    [
+      "0x0084",
+      8
+    ]
+  ],
+  "explicitly_disabled": [
+    [
+      "0x0060",
+      4
+    ]
+  ],
+  "function_code": 3,
+  "production": {
+    "service": "ais-energy.service",
+    "main_pid": 28181,
+    "serial_device": "/dev/ttyUSB0",
+    "service_start_utc": "2026-09-08T15:19:25Z",
+    "sole_owner_baseline_pids": [
+      28181
+    ],
+    "source_sha256_operator_stated": "4ae40bfe80e14054294b85e257bcbaa4acf76d0344e82ab4be2663d30f404bcb",
+    "source_sha256_verification": "NOT independently verified by collector (production file not read per task constraints)"
+  },
+  "preserved_manifest_sources": [
+    {
+      "path": "/home/ais/fcn300-diagnostics/evidence/discovery-allowlist.json",
+      "sha256": "928a64c309736f1308e202ba9c68195b9ea7f0adbab92c91bb75c673ee9247bc",
+      "size_bytes": 4302,
+      "mtime_utc": "2026-09-08T15:19:25.493603558+00:00"
+    },
+    {
+      "path": "/home/ais/fcn300-diagnostics/evidence/existing-evidence-reanalysis.json",
+      "sha256": "2c6993ac46ccb8b6ac08ee6d61d3e1af2a285ed7b0a662ea4682b415d343cb4b",
+      "size_bytes": 4367,
+      "mtime_utc": "2026-09-08T15:19:25.497603536+00:00"
+    },
+    {
+      "path": "/home/ais/fcn300-diagnostics/evidence/reconciled-baseline-20260908T150842Z.json",
+      "sha256": "c56e0353a8d03fcb7b3d38f4f9e40cd4268222ba096fdf25d9b3f321f4ae9117",
+      "size_bytes": 2933,
+      "mtime_utc": "2026-09-08T15:23:15.968561038+00:00"
+    }
+  ],
+  "schedule": {
+    "attempt_slot_grid_seconds": 5.0,
+    "budgets": {
+      "max_attempts": 240,
+      "max_minutes": 20
+    },
+    "monotonic": "fixed grid; overruns shift subsequent slots later, never burst; per-request timeout 4.0 s",
+    "owner_check_cadence": "attempts where attempt%12==1, via fuser (read-only)",
+    "skew_ms_definition": "diag_request_start_utc minus root_request_start_utc, milliseconds",
+    "slow_rule": "candidate elapsed_ms>1000 counts toward stop after 3 consecutive occurrences"
+  },
+  "segments": [
+    {
+      "attempts": "1-1",
+      "outcome": "false stop (collector bug, disclosed)",
+      "note": "Aborted after attempt 1 on a false ownership signal: the collector parsed non-verbose fuser output with a verbose-format parser, yielding an empty pid set. Attempt 1 itself was fully usable (same session) and its line is preserved in samples.jsonl. Parser fixed before segment 2."
+    },
+    {
+      "attempts": "2-13",
+      "grid": "fresh 5.0 s monotonic grid (inter-segment gap disclosed; no catch-up burst)",
+      "outcome": "stopped per rule; see stop_reason"
+    }
+  ],
+  "stats": {
+    "attempts": 13,
+    "usable": 13,
+    "unusable": 0,
+    "stop_reason": "production lost sole serial ownership",
+    "stop_reason_context": "Owner check on attempt 13 returned an empty pid set (fuser returncode 0). Service MainPID (28181) and start timestamp (15:19:25Z) were identical before and after; candidate sequences advanced 1024->1158 across the run, indicating uninterrupted serial flow. Assessed as a transient empty read, but recorded and honored as a stop per task rules; nothing was restarted or repaired.",
+    "session_id": "2026-09-08T15:19:25Z-pid-28181",
+    "sequence_min": 1024,
+    "sequence_max": 1158,
+    "per_block_usable_counts": {
+      "0x0040+2": 1,
+      "0x0064+8": 2,
+      "0x006C+4": 3,
+      "0x0070+8": 2,
+      "0x0078+4": 1,
+      "0x007C+8": 2,
+      "0x0084+8": 2
+    },
+    "vi_ranges_observed": {
+      "voltage_l1": {
+        "min": 235.1668,
+        "max": 235.1668,
+        "n": 13
+      },
+      "voltage_l2": {
+        "min": 236.5931,
+        "max": 236.5931,
+        "n": 13
+      },
+      "voltage_l3": {
+        "min": 235.3836,
+        "max": 235.7537,
+        "n": 13
+      },
+      "current_a": {
+        "min": 0.0,
+        "max": 0.0,
+        "n": 13
+      },
+      "current_b": {
+        "min": 0.0,
+        "max": 0.0,
+        "n": 13
+      },
+      "current_c": {
+        "min": 2.736,
+        "max": 2.8,
+        "n": 13
+      }
+    },
+    "first_client_utc": "2026-09-08T15:34:30.554Z",
+    "last_client_utc": "2026-09-08T15:36:28.740Z",
+    "first_source_utc": "2026-09-08T15:34:30",
+    "last_source_utc": "2026-09-08T15:36:27",
+    "owner_baseline": [
+      "28181"
+    ],
+    "owner_final": [],
+    "owner_checks": [
+      {
+        "attempt": 1,
+        "pids": [],
+        "match": false
+      },
+      {
+        "attempt": 13,
+        "pids": [],
+        "returncode": 0,
+        "match": false
+      }
+    ]
+  },
+  "panel_reference": {
+    "count": 0,
+    "path": null,
+    "note": "No operator readings were supplied during the run; file not created."
+  },
+  "written_files": {
+    "samples.jsonl": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-observation-20260908T153406Z/samples.jsonl",
+      "sha256": "65ac7440bfbaec124a6e35571764ba6a53b0c0d4ef5869ff56af125841ea6648",
+      "lines": 13
+    },
+    "collector-summary.json": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-observation-20260908T153406Z/collector-summary.json",
+      "sha256": "6b2c83254198fc59e90524d3cb6c883b760a433fa531432b708dcb8251b91481"
+    },
+    "manifest.json": {
+      "path": "/home/ais/fcn300-diagnostics/evidence/packet03-observation-20260908T153406Z/manifest.json",
+      "integrity_note": "Self hash omitted by construction (a file cannot contain its own hash). Final file hash reported in the collection report; re-hashable at any time."
+    }
+  }
+}

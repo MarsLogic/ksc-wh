@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KSC-WH Energy Console</title><link rel="stylesheet" href="/static/style.css"></head><body><main>
+<header class="app-head"><div><div class="eyebrow">KSC-WH · FCN300-3E4Y</div><h1>Workshop energy console</h1><div class="subhead">Accepted production measurements · local time UTC+7</div></div><div class="head-right"><div id="status" class="status stale">STARTING</div><div id="signature" class="signature" aria-label="Made by iw3">Made by iw3</div><button id="theme" class="theme" type="button" aria-label="Toggle color theme">LIGHT</button></div></header>
+<nav aria-label="Dashboard views"><button class="tab active" data-view="overview">OVERVIEW</button><button class="tab" data-view="live">LIVE</button><button class="tab" data-view="energy">ENERGY</button><button class="tab" data-view="compare">COMPARE</button><button class="tab" data-view="system">SYSTEM</button></nav>
+
+<section id="overview" class="view">
+  <section class="energy-hero"><div><span class="label">ENERGY TODAY</span><div><strong id="today-total">—</strong><span class="unit">kWh</span></div><p id="today-note">Loading accepted energy history…</p></div><div class="hero-facts"><div><span>Avg demand</span><b id="today-demand">—</b></div><div><span>Previous day</span><b id="today-delta">—</b></div><div><span>Coverage</span><b id="today-coverage">—</b></div><div><span>Meter total</span><b id="energy-overview">—</b></div></div></section>
+  <div class="layout-main"><article class="phase-panel"><div class="section-head"><div><span class="kicker">CURRENT STATE</span><h2>Three-phase electrical state</h2></div><span id="overview-age" class="reading-age">—</span></div><div id="overview-phases" class="phase-table"></div></article>
+  <aside class="insight-panel"><span class="kicker">RECENT OBSERVATIONS</span><h2>What changed</h2><ol id="insights"><li>Loading recent context…</li></ol></aside></div>
+  <div class="overview-lower"><article><span class="kicker">RECENT CONTEXT</span><dl id="recent-context"></dl></article><article><span class="kicker">DATA TRUST</span><dl id="overview-health"></dl></article></div>
+</section>
+
+<section id="live" class="view hidden">
+  <div class="section-title"><div><span class="kicker">LIVE MEASUREMENTS</span><h2>Three-phase detail</h2></div><span>Snapshots update every 2 seconds</span></div>
+  <div class="grid live-grid"><article><h3>Voltage</h3><div id="voltage" class="metrics"></div><svg id="voltage-trend" class="mini-chart" viewBox="0 0 640 150" role="img" aria-label="Voltage phase averages during the last 60 minutes"></svg><div class="phase-legend"><i></i>L1 <i></i>L2 <i></i>L3</div><div id="voltage-context" class="context-grid"></div></article>
+  <article><h3>Current</h3><div id="current" class="metrics"></div><svg id="current-trend" class="mini-chart" viewBox="0 0 640 150" role="img" aria-label="Current phase averages during the last 60 minutes"></svg><div class="phase-legend"><i></i>A <i></i>B <i></i>C</div><div id="current-context" class="context-grid"></div></article></div>
+  <article class="imbalance-panel"><h3>Imbalance context</h3><div id="imbalance-context" class="context-grid four"></div><p>Spread is (maximum − minimum) ÷ phase average. It is context, not an alarm threshold.</p></article>
+</section>
+
+<section id="energy-view" class="view hidden">
+  <div class="section-title"><div><span class="kicker">ACCEPTED ACTIVE ENERGY</span><h2>Period consumption</h2></div><span>Demand values are interval-derived</span></div>
+  <div class="toolbar"><select id="preset" aria-label="Energy period"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="7d">Last 7 Days</option><option value="month">This Month</option><option value="prev">Previous Month</option><option value="custom">Custom</option></select><label>From <input id="from" type="date"></label><label>To <input id="to" type="date"></label><button id="load" type="button">Load period</button></div>
+  <div class="summary-strip"><div><span>Total use</span><b id="total">—</b><small>kWh</small></div><div><span>Avg demand</span><b id="period-demand">—</b><small>kW · interval</small></div><div><span>Peak period</span><b id="peak-period">—</b><small id="peak-value">—</small></div><div><span>Coverage</span><b id="coverage">—</b><small id="coverage-state">—</small></div></div>
+  <div id="quality" class="notice" role="status"></div>
+  <article class="chart-panel"><div class="chart-head"><div><h3 id="chart-title">Hourly energy use</h3><span id="chart-subtitle">Energy counter difference per period</span></div><span class="chart-unit">kWh</span></div><svg id="chart" class="energy-chart" viewBox="0 0 960 340" role="img" aria-label="Energy use by period"></svg><div id="chart-empty" class="empty hidden"></div></article>
+  <article class="availability"><div><h3>Data availability</h3><span id="availability-copy">—</span></div><div id="availability-bar" class="availability-bar" aria-label="Data availability timeline"></div><div id="gap-summary" class="gap-summary"></div></article>
+</section>
+
+<section id="compare" class="view hidden">
+  <div class="section-title"><div><span class="kicker">PERIOD COMPARISON</span><h2>Energy use against prior periods</h2></div><span>Coverage-aware; incomplete periods are identified</span></div>
+  <div id="compare-grid" class="compare-grid"><article><h3>Today vs yesterday</h3><div id="cmp-day"></div></article><article><h3>This week vs previous week</h3><div id="cmp-week"></div></article><article><h3>This month vs previous month</h3><div id="cmp-month"></div></article></div>
+</section>
+
+<section id="system" class="view hidden">
+  <div class="section-title"><div><span class="kicker">OPERATIONS</span><h2>Monitoring and data health</h2></div><span id="system-updated">—</span></div>
+  <div class="system-grid"><article><h3>Monitoring</h3><dl id="system-monitoring"></dl></article><article><h3>Data</h3><dl id="system-data"></dl></article><article><h3>Quality</h3><dl id="system-quality"></dl></article><article><h3>Service</h3><dl id="system-service"></dl></article></div>
+  <details><summary>Engineering details</summary><div class="engineering"><p><b>Accepted:</b> voltage_l1/l2/l3, current_a/b/c, energy_kwh.</p><p><b>Energy:</b> FC03 0x008A · two registers · float32 ABCD ÷ 1000 · total positive active energy, primary side.</p><p><b>Unaccepted:</b> P/Q/S/PF/f, kvarh and kVAh. They are not shown or used.</p><pre id="engineering-diag">Diagnostic identifiers load here.</pre></div></details>
+</section>
+<footer>Read-only operator console · missing data is never presented as zero use</footer>
+</main><script src="/static/app.js"></script></body></html>
