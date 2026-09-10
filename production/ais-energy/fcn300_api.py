@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FORT FCN300-3E4Y Modbus RTU live V/I reader and REST API.
+"""FCN300-family Modbus RTU reader using the documented 3E4Y register map.
 Hardware: CH340 USB-RS485 adapter (/dev/powermeter -> /dev/ttyUSB0).
 """
 
@@ -18,16 +18,19 @@ import serial
 PORT = "/dev/powermeter"
 BAUD = 9600  # Fixed from BAWD
 SLAVE_ID = 1
+METER_CONFIG = {
+    "ct_quantity_raw": 256,
+    "ct_quantity_interpretation": "UNKNOWN (manual wording ambiguous)",
+    "voltage_multiplier": 1,
+    "pt_divisor": 1,
+    "current_multiplier": 40,
+    "effective_primary_secondary_ratio": 40,
+    "verified_at": "2026-09-09T18:06:23Z",
+}
 
-UNRESOLVED_KEYS = (
-    "frequency", "active_power_kw", "reactive_power_kvar",
-    "apparent_power_kva", "power_factor", "energy_kwh", "kvarh", "kVAh",
-)
-
-# ---- Validated V/I acquisition (partial cutover 2026-09-08) -----------------
-# BE-uint32 /10000 blocks, proven against field photos + 15-min monitoring
-# (see /home/ais/fcn300-diagnostics/docs/register-research.md). Read with
-# read_regs() (atomic) in the main poller pass. NO corrections apply here.
+# ---- Authoritative documented + empirically verified acquisition ------------
+# FCN300-3E4Y manual addresses, confirmed against panel/load observations.
+# All blocks use FC03 through this sole production serial owner.
 # (base_addr, word_count, ((key, word_offset), ...))
 VI_BLOCKS = (
     (0x0042, 6, (("voltage_l1", 0), ("voltage_l2", 2), ("voltage_l3", 4))),
@@ -38,13 +41,25 @@ VALIDATED_KEYS = frozenset(("voltage_l1", "voltage_l2", "voltage_l3",
                             "current_a", "current_b", "current_c",
                             "current_avg"))
 VI_FRESHNESS_SECONDS = 5.0
+POWER_BLOCK = (0x0064, 29)
+POWER_KEYS = frozenset((
+    "active_power_a_kw", "active_power_b_kw", "active_power_c_kw",
+    "active_power_kw", "reactive_power_a_kvar", "reactive_power_b_kvar",
+    "reactive_power_c_kvar", "reactive_power_kvar",
+    "apparent_power_a_kva", "apparent_power_b_kva",
+    "apparent_power_c_kva", "apparent_power_kva", "power_factor_a",
+    "power_factor_b", "power_factor_c", "power_factor", "frequency",
+))
 ENERGY_POLL_SECONDS = 30.0
 ENERGY_FRESHNESS_SECONDS = 90.0
-ENERGY_BLOCK = (0x008A, 2)
+ENERGY_BLOCK = (0x0082, 24)
 _validated_lock = threading.Lock()
 _validated = {"values": {}, "timestamp": None, "ok": False}
+_power_lock = threading.Lock()
+_power = {"values": {}, "raw": None, "timestamp": None, "ok": False,
+          "error": None}
 _energy_lock = threading.Lock()
-_energy = {"value": None, "raw": None, "timestamp": None, "ok": False,
+_energy = {"values": {}, "raw": None, "timestamp": None, "ok": False,
            "error": None}
 
 # ---- Diagnostic side-channel (additive, read-only) --------------------------
@@ -63,6 +78,9 @@ DEVICE_NAME = "FCN300-POWER-1"
 PERSISTED_KEYS = frozenset((
     "device_name", "voltage_l1", "voltage_l2", "voltage_l3",
     "current_a", "current_b", "current_c", "energy_kwh",
+    "active_power_kw", "reactive_power_kvar", "apparent_power_kva",
+    "power_factor", "frequency", "reactive_energy_kvarh",
+    "apparent_energy_kvah",
 ))
 
 
@@ -146,9 +164,21 @@ def _validated_snapshot() -> dict:
     return snap
 
 
+def _power_snapshot() -> dict:
+    with _power_lock:
+        snap = dict(_power)
+        snap["values"] = dict(_power["values"])
+    age = _age_seconds(snap["timestamp"])
+    snap["sample_age_seconds"] = round(age, 3) if age is not None else None
+    snap["fresh"] = bool(snap["ok"] and age is not None
+                         and age <= VI_FRESHNESS_SECONDS)
+    return snap
+
+
 def _energy_snapshot() -> dict:
     with _energy_lock:
         snap = dict(_energy)
+        snap["values"] = dict(_energy["values"])
     age = _age_seconds(snap["timestamp"])
     snap["sample_age_seconds"] = round(age, 3) if age is not None else None
     snap["fresh"] = bool(snap["ok"] and age is not None
@@ -156,19 +186,71 @@ def _energy_snapshot() -> dict:
     return snap
 
 
-def decode_energy(words: list[int] | None, previous: float | None = None) -> tuple[float | None, str | None]:
-    if words is None or len(words) != 2:
-        return None, "incomplete FC03 block"
+def _u32(words: list[int], offset: int) -> int:
+    return (words[offset] << 16) | words[offset + 1]
+
+
+def _s32(words: list[int], offset: int) -> int:
+    value = _u32(words, offset)
+    return value - 0x100000000 if value >= 0x80000000 else value
+
+
+def _s16(value: int) -> int:
+    return value - 0x10000 if value >= 0x8000 else value
+
+
+def _float32(words: list[int], offset: int) -> float:
+    return struct.unpack(">f", struct.pack(">HH", *words[offset:offset + 2]))[0]
+
+
+def decode_power(words: list[int] | None) -> tuple[dict, str | None]:
+    if words is None or len(words) != POWER_BLOCK[1]:
+        return {}, "incomplete FC03 block"
+    values = {}
+    groups = (
+        ("active_power", 0, "kw"),
+        ("reactive_power", 8, "kvar"),
+        ("apparent_power", 16, "kva"),
+    )
+    for prefix, start, unit in groups:
+        for suffix, offset in zip(("a", "b", "c", ""), range(start, start + 8, 2)):
+            key = f"{prefix}_{suffix + '_' if suffix else ''}{unit}"
+            values[key] = round(_s32(words, offset) / 10000.0, 4)
+    for suffix, offset in zip(("a", "b", "c", ""), range(24, 28)):
+        key = f"power_factor{'_' + suffix if suffix else ''}"
+        values[key] = round(_s16(words[offset]) / 1000.0, 3)
+    values["frequency"] = round(words[28] / 100.0, 2)
+    if not all(math.isfinite(value) for value in values.values()):
+        return {}, "invalid power value"
+    return values, None
+
+
+def decode_energy(words: list[int] | None,
+                  previous: float | None = None) -> tuple[dict, str | None]:
+    if words is None or len(words) != ENERGY_BLOCK[1]:
+        return {}, "incomplete FC03 block"
     try:
-        raw = struct.unpack(">f", struct.pack(">HH", *words))[0]
+        values = {
+            "secondary_active_import_kwh": _u32(words, 0) / 1000.0,
+            "secondary_active_export_kwh": _u32(words, 2) / 1000.0,
+            "secondary_reactive_import_kvarh": _u32(words, 4) / 1000.0,
+            "secondary_reactive_export_kvarh": _u32(words, 6) / 1000.0,
+            "energy_kwh": _float32(words, 8) / 1000.0,
+            "active_energy_export_kwh": _float32(words, 10) / 1000.0,
+            "reactive_energy_kvarh": _float32(words, 12) / 1000.0,
+            "reactive_energy_export_kvarh": _float32(words, 14) / 1000.0,
+            "secondary_apparent_import_kvah": _u32(words, 16) / 1000.0,
+            "secondary_apparent_export_kvah": _float32(words, 18) / 1000.0,
+            "apparent_energy_kvah": _float32(words, 20) / 1000.0,
+            "apparent_energy_export_kvah": _float32(words, 22) / 1000.0,
+        }
     except (struct.error, TypeError):
-        return None, "float decode failure"
-    if not math.isfinite(raw) or raw < 0:
-        return None, "invalid energy float"
-    value = raw / 1000.0
-    if previous is not None and value < previous:
-        return None, "energy decreased"
-    return value, None
+        return {}, "energy decode failure"
+    if not all(math.isfinite(value) and value >= 0 for value in values.values()):
+        return {}, "invalid energy value"
+    if previous is not None and values["energy_kwh"] < previous:
+        return {}, "energy decreased"
+    return {key: round(value, 3) for key, value in values.items()}, None
 
 
 def post_to_postgrest(payload: dict):
@@ -234,7 +316,7 @@ def poller_loop():
                 time.sleep(2)
                 continue
 
-        # Validated V/I blocks (partial cutover): atomic reads, BE-uint32
+        # Validated V/I blocks: atomic reads, BE-uint32
         # /10000, NO corrections. On failure the previous validated values
         # stay served with their original timestamp (age grows visibly);
         # frozen 0x00 words are never consulted for these keys.
@@ -270,19 +352,43 @@ def poller_loop():
                 _validated["timestamp"] = _utc_now()
             _validated["ok"] = complete_vi
 
+        # Documented P/Q/S/PF/f block, one coherent FC03 transaction.
+        pbase, pcount = POWER_BLOCK
+        pwords = read_regs(ser, pbase, pcount)
+        power_values, power_error = decode_power(pwords)
+        pname = f"0x{pbase:04X}+{pcount}"
+        if power_values:
+            captured = _utc_now()
+            with _power_lock:
+                _power.update(values=power_values, raw=list(pwords),
+                              timestamp=captured, ok=True, error=None)
+            for i, word in enumerate(pwords):
+                raw_new[f"0x{pbase + i:04X}"] = word
+            block_status[pname] = {"ok": True, "coherent": True,
+                                   "source_timestamp": captured,
+                                   "source": "authoritative FC03 power block"}
+        else:
+            with _power_lock:
+                _power.update(ok=False, error=power_error)
+            block_status[pname] = {"ok": False, "coherent": False,
+                                   "source_timestamp": None,
+                                   "source": "authoritative FC03 power block",
+                                   "error": power_error}
+        power = _power_snapshot()
+
         # Slow cumulative-energy read; V/I remains first priority.
         now = time.time()
         if now - last_energy_poll >= ENERGY_POLL_SECONDS:
             last_energy_poll = now
             ebase, ecount = ENERGY_BLOCK
             ewords = read_regs(ser, ebase, ecount)
-            previous = _energy_snapshot()["value"]
-            energy_value, energy_error = decode_energy(ewords, previous)
+            previous = _energy_snapshot()["values"].get("energy_kwh")
+            energy_values, energy_error = decode_energy(ewords, previous)
             ename = f"0x{ebase:04X}+{ecount}"
-            if energy_value is not None:
+            if energy_values:
                 captured = _utc_now()
                 with _energy_lock:
-                    _energy.update(value=round(energy_value, 3), raw=list(ewords),
+                    _energy.update(values=energy_values, raw=list(ewords),
                                    timestamp=captured, ok=True, error=None)
                 for i, word in enumerate(ewords):
                     raw_new[f"0x{ebase + i:04X}"] = word
@@ -318,9 +424,16 @@ def poller_loop():
                 "current_a": live_vi.get("current_a"),
                 "current_b": live_vi.get("current_b"),
                 "current_c": live_vi.get("current_c"),
-                "energy_kwh": energy["value"] if energy["fresh"] else None,
             }
-            if vi["fresh"]:
+            if power["fresh"]:
+                payload.update({key: power["values"].get(key) for key in (
+                    "active_power_kw", "reactive_power_kvar",
+                    "apparent_power_kva", "power_factor", "frequency")})
+            if energy["fresh"]:
+                payload.update({key: energy["values"].get(key) for key in (
+                    "energy_kwh", "reactive_energy_kvarh",
+                    "apparent_energy_kvah")})
+            if vi["fresh"] and power["fresh"]:
                 threading.Thread(target=post_to_postgrest, args=(payload,), daemon=True).start()
 
         _replace_raw_snapshot(raw_new, complete_vi, block_status)
@@ -344,24 +457,28 @@ def application(environ, start_response):
 
     if path in ("/", ""):
         vi = _validated_snapshot()
-        data = {key: None for key in UNRESOLVED_KEYS}
+        data = {}
         data.update(vi["values"])
+        power = _power_snapshot()
+        if power["fresh"]:
+            data.update(power["values"])
         energy = _energy_snapshot()
-        data["energy_kwh"] = energy["value"] if energy["fresh"] else None
+        if energy["fresh"]:
+            data.update(energy["values"])
         data.update(
             timestamp=vi["timestamp"], validated_timestamp=vi["timestamp"],
             sample_age_seconds=vi["sample_age_seconds"],
-            serial_ok=vi["fresh"], vi_status="VALID" if vi["fresh"] else "UNKNOWN",
-            unresolved_status={key: "UNKNOWN" for key in UNRESOLVED_KEYS},
+            serial_ok=vi["fresh"] and power["fresh"],
+            vi_status="VALID" if vi["fresh"] else "UNKNOWN",
+            power_status="VALID" if power["fresh"] else "UNKNOWN",
+            meter_config=METER_CONFIG,
         )
         data["energy_status"] = {
-            "raw_address": "0x008A", "raw_words": energy.get("raw"),
-            "decoded_float": (energy["value"] * 1000 if energy["value"] is not None else None),
+            "raw_address": "0x0082", "register_count": ENERGY_BLOCK[1],
+            "raw_words": energy.get("raw"),
             "sample_age_seconds": energy.get("sample_age_seconds"),
             "valid": energy.get("fresh"), "error": energy.get("error"),
         }
-        data["unresolved_status"]["energy_kwh"] = (
-            "VALID" if energy.get("fresh") else "UNKNOWN")
         with _persistence_lock:
             data["persistence"] = dict(_persistence)
         body = json.dumps(data, indent=2).encode("utf-8")
@@ -375,11 +492,12 @@ def application(environ, start_response):
 
     elif path == "/health":
         vi = _validated_snapshot()
+        power = _power_snapshot()
         with _persistence_lock:
             persistence = dict(_persistence)
         body = json.dumps({
-            "status": "ok" if vi["fresh"] else "stale",
-            "serial_ok": vi["fresh"],
+            "status": "ok" if vi["fresh"] and power["fresh"] else "stale",
+            "serial_ok": vi["fresh"] and power["fresh"],
             "sample_age_seconds": vi["sample_age_seconds"],
             "persistence": persistence,
         }).encode("utf-8")
@@ -407,10 +525,9 @@ def application(environ, start_response):
             }
         energy = _energy_snapshot()
         snap["energy"] = {
-            "address": "0x008A", "raw_words": energy.get("raw"),
-            "decoded_float": (energy["value"] * 1000
-                               if energy.get("value") is not None else None),
-            "energy_kwh": energy.get("value"),
+            "address": "0x0082", "register_count": ENERGY_BLOCK[1],
+            "raw_words": energy.get("raw"),
+            "values": energy.get("values"),
             "timestamp": energy.get("timestamp"),
             "fresh": energy.get("fresh"), "error": energy.get("error"),
         }
@@ -433,7 +550,7 @@ if __name__ == "__main__":
 
     srv = make_server("0.0.0.0", 8080, application)
     print("FORT FCN300 Live RS485 API active on http://0.0.0.0:8080")
-    print("Corrections applied to match panel readings")
+    print("Authoritative documented FC03 register map active")
 
     try:
         srv.serve_forever()

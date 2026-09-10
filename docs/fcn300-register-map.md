@@ -1,22 +1,22 @@
-# FCN300 register status
+# FCN300 authoritative register map
 
-This table separates empirical/documentary candidates from the accepted production contract. Provisional values are not persisted or shown as accepted.
+Reconciled 2026-09-09 against the FCN300-3E4Y User Manual and the existing live evidence. The live unit's exact physical suffix remains unconfirmed, but every tested address, type, scale, phase relationship, and energy ratio matches this map.
 
-| Measurement | Register family | Encoding/evidence | Status |
+| Measurement | FC03 register(s) | Decode | Final status |
 |---|---:|---|---|
-| Voltage L1/L2/L3 | `0x0042+` | Empirically matched voltage family | ACCEPTED |
-| Current A/B/C | `0x0058+` | Empirically matched current family | ACCEPTED |
-| Active power | `0x0064+` | Empirically matched; field seal pending | HIGH CONFIDENCE / NOT ACCEPTED |
-| Reactive power | `0x006C+` | Empirically matched; field seal pending | HIGH CONFIDENCE / NOT ACCEPTED |
-| Apparent power | `0x0074+` | Empirically matched; field seal pending | HIGH CONFIDENCE / NOT ACCEPTED |
-| Power factor | `0x007C–0x007F` | Empirically matched; field seal pending | HIGH CONFIDENCE / NOT ACCEPTED |
-| Frequency | `0x0080` | Empirically matched; field seal pending | HIGH CONFIDENCE / NOT ACCEPTED |
-| Total positive active energy | `0x008A–0x008B` | FORT FCN300-family manual; float32 ABCD; raw `/1000` kWh; integration error about `-0.0075%` | ACCEPTED / PRODUCTION |
-| Total negative active energy | `0x008C–0x008D` | Documented negative pair; observed zero/stable | NOT ACCEPTED |
-| Positive reactive-energy family | `0x008E–0x008F` | ABCD float; 30-minute integration and manual correlation | HIGH-CONFIDENCE CANDIDATE / NOT ACCEPTED |
-| Possible phase/tariff accumulator | `0x0092–0x0093` | Short-run structural candidate only | PLAUSIBLE / NOT ACCEPTED |
-| Positive apparent-energy family | `0x0096–0x0097` | ABCD float; 30-minute integration and manual correlation | HIGH-CONFIDENCE CANDIDATE / NOT ACCEPTED |
-| kvarh | undocumented candidate family | Needs field seal/OEM corroboration | HIGH-CONFIDENCE CANDIDATE / NOT ACCEPTED |
-| kVAh | undocumented candidate family | Needs field seal/OEM corroboration | HIGH-CONFIDENCE CANDIDATE / NOT ACCEPTED |
+| Phase voltage A/B/C | `0x0042/44/46`, 2 words each | unsigned BE32 ÷ 10,000 V | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Phase current A/B/C | `0x0058/5A/5C`, 2 words each | unsigned BE32 ÷ 10,000 A | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Active power A/B/C/total | `0x0064/66/68/6A`, 2 words each | signed BE32 ÷ 10,000 kW | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Reactive power A/B/C/total | `0x006C/6E/70/72`, 2 words each | signed BE32 ÷ 10,000 kvar | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Apparent power A/B/C/total | `0x0074/76/78/7A`, 2 words each | signed BE32 ÷ 10,000 kVA | DOCUMENTED + EMPIRICALLY VERIFIED |
+| PF A/B/C/total | `0x007C–0x007F` | signed int16 ÷ 1,000 | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Frequency | `0x0080` | unsigned int16 ÷ 100 Hz | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Secondary +active/+reactive/+apparent energy | `0x0082`, `0x0086`, `0x0092` | unsigned BE32 ÷ 1,000 | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Primary +active/+reactive/+apparent energy | `0x008A`, `0x008E`, `0x0096` | float32 ABCD ÷ 1,000 | DOCUMENTED + EMPIRICALLY VERIFIED |
+| Negative/export energy families | `0x0084`, `0x0088`, `0x008C`, `0x0090`, `0x0094`, `0x0098` | manual-specific unsigned/float forms | DOCUMENTED + LIVE DECODED |
 
-The FORT E13ZY(D)/FCN300-family manual is the documentary correlation used for the accepted `0x008A` mapping and the provisional energy-family interpretation. Historical `dashboard/register_map.py` is retained only as legacy evidence and is not the production source of truth.
+The 2026-09-09 commissioning snapshot produced exact primary/secondary ratios of `40.000` for all four non-zero energy pairs: active import, reactive import, reactive export, and apparent import. This independently confirms the float order and `/1000` primary-side conversion.
+
+Configuration read-only result: `0x002A=256`, `0x002C=1`, `0x002D=1`, `0x002E=40`. The effective current/primary multiplier is 40; the manual's wording for the raw CT quantity value at `0x002A` is ambiguous, so no more specific interpretation is claimed.
+
+Rejected legacy mappings remain rejected: `0x0053` is part of a voltage pair, `0x0210–0x0217` is not live total kWh, and `0x008E–0x008F` is primary positive reactive energy—not kWh.

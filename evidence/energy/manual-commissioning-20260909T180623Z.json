@@ -1,0 +1,29 @@
+{
+  "timestamp_utc": "2026-09-09T18:06:23Z",
+  "method": "one-shot bounded FC03 reads by the sole production serial owner",
+  "energy_block": {
+    "start": "0x0082",
+    "count": 24,
+    "raw_words": [0, 45522, 0, 0, 0, 33251, 0, 1361, 18910, 18048, 0, 0, 18850, 23488, 18260, 43008, 0, 57168, 0, 0, 18955, 37376, 0, 0],
+    "decoded": {
+      "secondary_active_import_kwh": 45.522,
+      "primary_active_import_kwh": 1820.88,
+      "secondary_reactive_import_kvarh": 33.251,
+      "primary_reactive_import_kvarh": 1330.04,
+      "secondary_reactive_export_kvarh": 1.361,
+      "primary_reactive_export_kvarh": 54.44,
+      "secondary_apparent_import_kvah": 57.168,
+      "primary_apparent_import_kvah": 2286.72
+    },
+    "primary_secondary_ratio": 40.0
+  },
+  "configuration": {
+    "0x002A_raw": 256,
+    "0x002C_voltage_multiplier": 1,
+    "0x002D_pt_divisor": 1,
+    "0x002E_current_multiplier": 40,
+    "0x002A_interpretation": "UNKNOWN: manual wording is ambiguous"
+  },
+  "classification": "DOCUMENTED + EMPIRICALLY VERIFIED",
+  "safety": "No writes, resets, broad scans, FC04, or second serial owner"
+}

@@ -1,10 +1,11 @@
 # KSC-WH Current Handoff
 
-Snapshot: 2026-09-09. This is the authoritative freeze entry point.
+Snapshot: 2026-09-10. This is the authoritative freeze entry point.
 
 ## Current project state
 
-Production monitoring is operational. Accepted and persisted measurements are voltage L1/L2/L3, current A/B/C, and total positive active energy `energy_kwh`. PostgreSQL 14, PostgREST, the production API, and the dashboard were healthy at snapshot time.
+Production monitoring is operational. The FCN300-3E4Y register map is documented and empirically verified for V/I/P/Q/S/PF/f and primary positive kWh/kvarh/kVAh. PostgreSQL 14, PostgREST, the production API, and the dashboard were healthy at snapshot time.
+The collector and dashboard are enabled user services; user lingering is enabled. The legacy OMP `diag` process has been stopped.
 
 ## Remote access
 
@@ -24,13 +25,13 @@ FCN300 → RS485/Modbus RTU → `/home/ais/ais-energy/fcn300_api.py` → HTTP AP
 
 - Voltage: `voltage_l1`, `voltage_l2`, `voltage_l3`.
 - Current: `current_a`, `current_b`, `current_c`.
-- Energy: `energy_kwh`, FC03 address `0x008A`, two registers, IEEE-754 float32 ABCD, decoded raw value divided by 1000.
+- Power: phase and total P/Q/S from `0x0064–0x007B`; PF from `0x007C–0x007F`; frequency from `0x0080`.
+- Primary positive energy: `energy_kwh` at `0x008A`, `reactive_energy_kvarh` at `0x008E`, and `apparent_energy_kvah` at `0x0096`; IEEE-754 float32 ABCD divided by 1000.
 - Energy polling is intentionally slow relative to V/I (approximately 30 seconds).
-- Provisional P/Q/S/PF/f/kvarh/kVAh are not accepted or persisted.
 
 ## Dashboard
 
-The deployed dashboard has OVERVIEW, LIVE, ENERGY, COMPARE, and SYSTEM views. It includes accepted V/I/kWh, interval-derived demand, bounded server-side aggregation, deterministic observations, coverage/gap reporting, responsive light/dark themes, and collapsed engineering details.
+The deployed dashboard has OVERVIEW, LIVE, ENERGY, COMPARE, and SYSTEM views. It includes accepted V/I/P/Q/S/PF/f and kWh/kvarh/kVAh, interval-derived demand, bounded server-side aggregation, deterministic observations, coverage/gap reporting, responsive light/dark themes, and collapsed engineering details.
 
 ## Database and recovery
 
@@ -38,19 +39,17 @@ The PostgreSQL mount-dependency repair is deployed at a high level: PostgreSQL s
 
 ## Current unresolved work
 
-1. Field-seal P/Q/S/PF/f.
-2. Decide/validate kvarh and kVAh.
-3. Authoritative CT/PT field verification.
-4. Optional retention/aggregation later.
-5. Controlled reboot-resilience verification if still not completed.
-6. Final closure documentation after those tasks.
+1. Physically confirm the exact meter model suffix on the device label.
+2. Resolve the vendor wording for raw CT quantity `0x002A=256`; effective primary/secondary ratio 40 is already verified.
+3. Optional retention/aggregation later.
+4. Controlled full-host reboot-resilience verification if required by operations.
 
 ## Safety rules
 
 - No Modbus writes or broad scans.
 - No second serial owner.
 - Do not promote guessed measurements.
-- Protect accepted V/I/kWh and keep unresolved values out of persistence.
+- Protect accepted measurements and keep unresolved interpretations out of persistence.
 
 ## Resume sequence
 

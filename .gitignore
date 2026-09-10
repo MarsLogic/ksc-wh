@@ -21,6 +21,10 @@ credentials/
 *.dump
 *.sql.gz
 tmp/
+.remote_snapshot/
+dashboard_upgrade/
+dashboard.remote.*
+tmp_manual.txt
 .cleanup-*/
 .cleanup-stage-*
 *.zip

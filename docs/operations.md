@@ -4,6 +4,7 @@ All commands below are read-only. Supply SSH credentials locally; none are store
 
 ```sh
 ssh ais@100.73.124.7
+systemctl --user is-active ais-energy.service fcn300-dashboard.service
 ps -ef | grep -E 'fcn300_api|fcn300-diagnostics/app.py' | grep -v grep
 fuser /dev/ttyUSB0
 curl -fsS http://127.0.0.1:8080/health
@@ -17,3 +18,5 @@ ss -ltnp | grep -E ':8080|:8090|:3000'
 ```
 
 If `/dev/ttyUSB0` has more than one owner, stop and investigate; do not start another serial client.
+
+Both production applications are enabled user services and user `ais` has lingering enabled. The legacy OMP `diag` process was retired after the systemd dashboard cutover.

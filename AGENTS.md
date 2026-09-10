@@ -1,6 +1,6 @@
 # Agent rules
 
-1. Read `HANDOFF.md` first.
+1. Read `HANDOFF.md`, `DEFAULT.md`, `ARCHITECTURE.md`, and `REGISTER-MAP.md` before significant changes.
 2. Preserve current production behavior and rollback paths.
 3. Never issue FCN300 Modbus writes or broad register scans.
 4. The production process must remain the sole `/dev/ttyUSB0` owner.

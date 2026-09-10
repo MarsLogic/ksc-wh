@@ -1,0 +1,13 @@
+[Unit]
+Description=FCN300 operator dashboard
+After=network.target ais-energy.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ais/fcn300-diagnostics
+ExecStart=/usr/bin/python3 /home/ais/fcn300-diagnostics/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

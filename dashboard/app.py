@@ -2,7 +2,7 @@
 """Read-only FCN300 operator dashboard and bounded reporting API."""
 from __future__ import annotations
 
-import json, math, os, statistics, time, urllib.request
+import json, math, os, socket, statistics, subprocess, time, urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,6 +18,18 @@ POSTGREST = os.environ.get("POSTGREST_URL", "http://127.0.0.1:3000/water_monitor
 PORT = int(os.environ.get("DIAG_PORT", "8090"))
 MAX_REPORT_ROWS = 60_000  # ponytail: bounded raw source; add a DB aggregate view when history outgrows this.
 _cache = {}
+PERSISTENCE_CADENCE_SECONDS = 5
+GAP_SECONDS = 20
+HISTORY_FIELDS = {
+    "voltage_l1": ("Voltage A", "V"), "voltage_l2": ("Voltage B", "V"), "voltage_l3": ("Voltage C", "V"),
+    "current_a": ("Current A", "A"), "current_b": ("Current B", "A"), "current_c": ("Current C", "A"),
+    "active_power_kw": ("Active power", "kW"), "reactive_power_kvar": ("Reactive power", "kvar"),
+    "apparent_power_kva": ("Apparent power", "kVA"), "power_factor": ("Power factor", ""),
+    "frequency": ("Frequency", "Hz"), "energy_kwh": ("Active import energy", "kWh"),
+}
+RANGES = {"live": (timedelta(minutes=15), 5), "1h": (timedelta(hours=1), 10),
+          "24h": (timedelta(hours=24), 60), "7d": (timedelta(days=7), 300),
+          "30d": (timedelta(days=30), 900)}
 
 def get_json(url, timeout=3.0):
     with urllib.request.urlopen(url, timeout=timeout) as response:
@@ -27,19 +39,46 @@ def iso(value):
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
+def latest_stored_row():
+    query=urlencode({"select":"created_at","order":"created_at.desc","limit":"1"})
+    rows=get_json(POSTGREST+"?"+query,2.5); stamp=iso(rows[0]["created_at"]) if rows else None
+    return {"status":"HEALTHY" if stamp else "UNKNOWN","last_row_timestamp":stamp.isoformat() if stamp else None,
+            "last_row_age_seconds":round(max(0,(datetime.now(timezone.utc)-stamp).total_seconds()),2) if stamp else None,
+            "cadence_seconds":PERSISTENCE_CADENCE_SECONDS,"gap_rule_seconds":GAP_SECONDS,"error":None}
+
+def recorder_health():
+    hit=_cache.get("latest-row")
+    if hit and time.monotonic()-hit[0]<4: return hit[1]
+    try: result=latest_stored_row()
+    except Exception as exc:
+        result={"status":"ERROR","last_row_timestamp":None,"last_row_age_seconds":None,
+                "cadence_seconds":PERSISTENCE_CADENCE_SECONDS,"gap_rule_seconds":GAP_SECONDS,
+                "error":f"{type(exc).__name__}: {exc}"}
+    _cache["latest-row"]=(time.monotonic(),result); return result
+
 def live():
     now = datetime.now(timezone.utc)
     try:
-        root, diag = get_json(PROD_ROOT), get_json(PROD_DIAG)
-        stamp = iso(root.get("timestamp", "")); age = max(0.0, (now-stamp).total_seconds())
-        serial = bool(root.get("serial_ok")); state = "LIVE" if serial and age <= 5 else ("STALE" if serial else "OFFLINE")
-        return {"state":state,"timestamp":root.get("timestamp"),"age_seconds":round(age,2),"serial_ok":serial,
-                "persistence":root.get("persistence",{}),"values":root,"diag":diag,"error":None}
+        root=get_json(PROD_ROOT)
     except Exception as exc:
         return {"state":"OFFLINE","timestamp":None,"age_seconds":None,"serial_ok":False,"persistence":{},
-                "values":{},"diag":{},"error":f"{type(exc).__name__}: {exc}"}
+                "recorder":recorder_health(),"values":{},"diag":{},"diag_error":None,
+                "error":f"{type(exc).__name__}: {exc}"}
+    try: stamp=iso(root.get("timestamp","")); age=max(0.0,(now-stamp).total_seconds())
+    except (TypeError,ValueError): stamp,age=None,None
+    serial=root.get("serial_ok")
+    state="ERROR" if serial is False else ("UNKNOWN" if serial is not True or stamp is None else ("LIVE" if age<=5 else "STALE"))
+    try: diag,diag_error=get_json(PROD_DIAG),None
+    except Exception as exc: diag,diag_error={},f"{type(exc).__name__}: {exc}"
+    return {"state":state,"timestamp":root.get("timestamp"),"age_seconds":round(age,2) if age is not None else None,
+            "serial_ok":serial,"persistence":root.get("persistence",{}),"recorder":recorder_health(),
+            "values":root,"diag":diag,"diag_error":diag_error,"error":None}
 
 def date_range(params, max_days=366):
+    if "start" in params and "end" in params:
+        start=iso(params["start"][0]); end=iso(params["end"][0]); days=(end-start).total_seconds()/86400
+        if days<=0 or days>max_days: raise ValueError(f"range must be positive and no more than {max_days} days")
+        return start.astimezone(LOCAL_TZ).date().isoformat(),end.astimezone(LOCAL_TZ).date().isoformat(),start,end
     today = datetime.now(LOCAL_TZ).date()
     start_date = datetime.fromisoformat(params.get("from",[today.isoformat()])[0]).date()
     end_date = datetime.fromisoformat(params.get("to",[(today+timedelta(days=1)).isoformat()])[0]).date()
@@ -67,7 +106,7 @@ def cadence(points):
 def availability(points,start,end,sample_cadence):
     effective_end=min(end,datetime.now(timezone.utc)); duration=max(1.0,(effective_end-start).total_seconds())
     expected=max(1,round(duration/sample_cadence)); coverage=min(100.0,len(points)/expected*100)
-    threshold=max(30.0,sample_cadence*3); gaps=[]; cursor=start
+    threshold=max(float(GAP_SECONDS),sample_cadence*3); gaps=[]; cursor=start
     for stamp,*_ in points:
         if (stamp-cursor).total_seconds()>threshold: gaps.append((cursor,stamp))
         cursor=stamp
@@ -76,7 +115,53 @@ def availability(points,start,end,sample_cadence):
             "longest_gap_seconds":round(max(((b-a).total_seconds() for a,b in gaps),default=0)),
             "last_gap":None if not gaps else {"start":gaps[-1][0].isoformat(),"end":gaps[-1][1].isoformat(),"seconds":round((gaps[-1][1]-gaps[-1][0]).total_seconds())},
             "current_gap":bool(gaps and gaps[-1][1]==effective_end),
-            "gaps":[{"start":a.isoformat(),"end":b.isoformat()} for a,b in gaps[-20:]]}
+            "gap_rule_seconds":threshold,
+            "gaps":[{"start":a.isoformat(),"end":b.isoformat(),"category":"COMMUNICATION"} for a,b in gaps[-50:]]}
+
+def history_range(params):
+    name=params.get("range",["24h"])[0]; now=datetime.now(timezone.utc)
+    if name in RANGES:
+        delta,bucket_seconds=RANGES[name]; return name,now-delta,now,bucket_seconds
+    if name!="custom": raise ValueError("range must be live, 1h, 24h, 7d, 30d, or custom")
+    start=iso(params.get("from",[""])[0]); end=iso(params.get("to",[""])[0]); seconds=(end-start).total_seconds()
+    if seconds<=0 or seconds>366*86400: raise ValueError("custom range must be between 1 second and 366 days")
+    return name,start,end,max(5,math.ceil(seconds/1500))
+
+def telemetry_history(params):
+    range_name,start,end,bucket_seconds=history_range(params)
+    requested=params.get("metrics",["active_power_kw"])[0].split(",")
+    metrics=list(dict.fromkeys(metric for metric in requested if metric in HISTORY_FIELDS))
+    if not metrics or len(metrics)>10: raise ValueError("request 1-10 supported metrics")
+    rows,truncated=fetch_rows("created_at,"+",".join(metrics),start,end)
+    samples=[]; grouped=defaultdict(lambda:defaultdict(list))
+    for row in rows:
+        try: stamp=iso(row["created_at"])
+        except (KeyError,TypeError,ValueError): continue
+        samples.append((stamp,)); bucket=math.floor(stamp.timestamp()/bucket_seconds)*bucket_seconds
+        for metric in metrics:
+            try:
+                value=float(row[metric])
+                if math.isfinite(value): grouped[bucket][metric].append(value)
+            except (KeyError,TypeError,ValueError): pass
+    first=math.floor(start.timestamp()/bucket_seconds)*bucket_seconds
+    last=math.floor(min(end,datetime.now(timezone.utc)).timestamp()/bucket_seconds)*bucket_seconds
+    timestamps=[]; series={metric:[] for metric in metrics}; cursor=first
+    while cursor<=last:
+        timestamps.append(cursor)
+        for metric in metrics:
+            values=grouped[cursor].get(metric,[]); series[metric].append(round(statistics.fmean(values),4) if values else None)
+        cursor+=bucket_seconds
+    summaries={}
+    for metric in metrics:
+        values=[(timestamps[i],value) for i,value in enumerate(series[metric]) if value is not None]
+        summaries[metric]=None if not values else {"min":min(v for _,v in values),"max":max(v for _,v in values),
+            "average":round(statistics.fmean(v for _,v in values),4),
+            "peak_timestamp":datetime.fromtimestamp(max(values,key=lambda item:item[1])[0],timezone.utc).isoformat()}
+    sample_cadence=cadence(samples)
+    return {"range":range_name,"from":start.isoformat(),"to":end.isoformat(),"bucket_seconds":bucket_seconds,
+            "rows":len(samples),"truncated":truncated,"timestamps":timestamps,"series":series,
+            "meta":{metric:{"label":HISTORY_FIELDS[metric][0],"unit":HISTORY_FIELDS[metric][1]} for metric in metrics},
+            "summary":summaries,"quality":availability(samples,start,end,sample_cadence),"error":None}
 
 def energy_history(params):
     start_label,end_label,start,end=date_range(params); rows,truncated=fetch_rows("created_at,energy_kwh",start,end)
@@ -157,6 +242,24 @@ def electrical_history():
     return {"range":"today","buckets":buckets,"last_hour":summary(recent),"today":summary(points),
             "phase_dominance_60m":dominance,"quality":quality,"rows":len(points),"truncated":truncated,"error":None}
 
+def fixed_command(args):
+    try:
+        result=subprocess.run(args,capture_output=True,text=True,timeout=2,check=False)
+        return result.stdout.strip() if result.returncode==0 else "UNAVAILABLE"
+    except (OSError,subprocess.TimeoutExpired): return "UNAVAILABLE"
+
+def tcp_state(port):
+    try:
+        with socket.create_connection(("127.0.0.1",port),timeout=1): return "HEALTHY"
+    except OSError: return "UNAVAILABLE"
+
+def diagnostics():
+    services={service:fixed_command(["systemctl","--user","is-active",service]).upper()
+              for service in ("ais-energy.service","fcn300-dashboard.service")}
+    owner=fixed_command(["fuser","/dev/ttyUSB0"])
+    return {"services":services,"postgres":tcp_state(5432),"postgrest":tcp_state(3000),
+            "serial_owner_pids":owner or "UNAVAILABLE","dashboard":"HEALTHY","error":None}
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,fmt,*args): pass
     def send(self,status,body,ctype="application/json"):
@@ -167,13 +270,16 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path in ("/","/index.html"): self.send(200,(HERE/"static"/"index.html").read_bytes(),"text/html; charset=utf-8"); return
             if path=="/api/live": self.send(200,json.dumps(live())); return
+            if path=="/api/history": self.send(200,json.dumps(telemetry_history(parse_qs(parsed.query)))); return
             if path=="/api/energy": self.send(200,json.dumps(energy_history(parse_qs(parsed.query)))); return
             if path=="/api/electrical-history": self.send(200,json.dumps(electrical_history())); return
+            if path=="/api/diagnostics": self.send(200,json.dumps(diagnostics())); return
             if path=="/healthz": self.send(200,'{"status":"ok","app":"fcn300-dashboard"}'); return
             if path.startswith("/static/"):
                 file=(HERE/"static"/path[8:]).resolve()
                 if HERE/"static" not in file.parents or not file.is_file(): self.send(404,b"not found","text/plain"); return
-                self.send(200,file.read_bytes(),"text/css; charset=utf-8" if file.suffix==".css" else "application/javascript; charset=utf-8"); return
+                types={".css":"text/css; charset=utf-8",".js":"application/javascript; charset=utf-8",".txt":"text/plain; charset=utf-8"}
+                self.send(200,file.read_bytes(),types.get(file.suffix,"application/octet-stream")); return
             self.send(404,b"not found","text/plain")
         except ValueError as exc: self.send(400,json.dumps({"error":str(exc)}))
         except Exception as exc: self.send(502,json.dumps({"error":f"{type(exc).__name__}: {exc}"}))

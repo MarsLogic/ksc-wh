@@ -1,139 +1,104 @@
-const $=id=>document.getElementById(id), num=v=>Number.isFinite(Number(v))?Number(v):null;
-const fmt=(v,d=2)=>num(v)==null?'—':Number(v).toFixed(d), pct=v=>num(v)==null?'—':fmt(v,1)+'%', when=v=>v?new Date(v).toLocaleString([], {hour:'2-digit',minute:'2-digit'}):'—';
-const age=s=>s==null?'—':s<60?fmt(s,1)+' s':Math.floor(s/60)+' m '+Math.floor(s%60)+' s';
-const duration=s=>s==null?'—':s<60?Math.round(s)+' s':s<3600?Math.floor(s/60)+' m':Math.floor(s/3600)+' h '+Math.floor((s%3600)/60)+' m';
-const avg=a=>{let x=a.map(num).filter(v=>v!=null);return x.length?x.reduce((p,v)=>p+v,0)/x.length:null};
-const imbalance=a=>{let x=a.map(num).filter(v=>v!=null),m=avg(x);return m?((Math.max(...x)-Math.min(...x))/m*100):null};
+const $=id=>document.getElementById(id), numeric=v=>v!==null&&v!==''&&Number.isFinite(Number(v))?Number(v):null;
+const fmt=(v,d=2)=>numeric(v)==null?'—':Number(v).toFixed(d), pct=v=>numeric(v)==null?'—':fmt(v,1)+'%';
+const age=s=>s==null?'—':s<60?fmt(s,1)+' s':s<3600?Math.floor(s/60)+' m '+Math.floor(s%60)+' s':Math.floor(s/3600)+' h '+Math.floor((s%3600)/60)+' m';
+const localTime=v=>v?new Date(v).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
 const ymd=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
-const addDays=(d,n)=>{let x=new Date(d);x.setDate(x.getDate()+n);return x};
-let liveData={}, energyData={}, electricalData=null, loaded={energy:false,electrical:false,compare:false};
+const addDays=(d,n)=>{let copy=new Date(d);copy.setDate(copy.getDate()+n);return copy};
+const avg=values=>{let valid=values.map(numeric).filter(v=>v!=null);return valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:null};
+const spread=values=>{let valid=values.map(numeric).filter(v=>v!=null),mean=avg(valid);return mean?((Math.max(...valid)-Math.min(...valid))/mean*100):null};
+const row=(label,value,state='')=>`<dt>${label}</dt><dd class="${state}">${value}</dd>`;
+const stateClass=value=>String(value||'UNKNOWN').toLowerCase(), stateWord=value=>String(value||'UNKNOWN').toUpperCase();
+let liveData={values:{}}, energy={}, diag={}, plots={}, loaded={overview:false,electrical:false,energy:false,history:false,diagnostics:false};
 
-function metric(label,value,unit=''){return `<div class="metric"><span>${label}</span><b>${value}</b><small>${unit}</small></div>`}
-function row(label,value,state=''){return `<dt>${label}</dt><dd class="${state}">${value}</dd>`}
-function stateWord(value){return String(value||'UNAVAILABLE').toUpperCase()}
-function phaseMatrix(v){
-  let vs=[num(v.voltage_l1),num(v.voltage_l2),num(v.voltage_l3)], cs=[num(v.current_a),num(v.current_b),num(v.current_c)];
-  let hi=cs.some(x=>x!=null)?cs.indexOf(Math.max(...cs.filter(x=>x!=null))):null;
-  return `<div class="phase-row phase-head"><span>MEASURE</span><span>L1 / A</span><span>L2 / B</span><span>L3 / C</span><span>AVG</span></div>
-  <div class="phase-row"><b>Voltage</b>${vs.map(x=>`<span>${fmt(x)} <small>V</small></span>`).join('')}<strong>${fmt(avg(vs))} <small>V</small></strong></div>
-  <div class="phase-row"><b>Current</b>${cs.map((x,i)=>`<span class="${i===hi?'phase-high':''}">${fmt(x)} <small>A</small></span>`).join('')}<strong>${fmt(avg(cs))} <small>A</small></strong></div>
-  <div class="phase-foot"><span>Voltage spread <b>${pct(imbalance(vs))}</b></span><span>Current spread <b>${pct(imbalance(cs))}</b></span><span>Highest current <b>${hi==null?'—':'Phase '+['A','B','C'][hi]+' · '+fmt(cs[hi])+' A'}</b></span></div>`;
+async function api(url){let response=await fetch(url,{cache:'no-store'});if(!response.ok)throw Error(await response.text());return response.json()}
+function colors(){let s=getComputedStyle(document.body);return {text:s.color,muted:s.getPropertyValue('--muted').trim(),grid:s.getPropertyValue('--line').trim(),accent:s.getPropertyValue('--accent').trim(),a:s.getPropertyValue('--phase-a').trim(),b:s.getPropertyValue('--phase-b').trim(),c:s.getPropertyValue('--phase-c').trim()}}
+function plotHeight(el){return el.classList.contains('history-plot')?410:el.classList.contains('small')?235:300}
+function destroyPlot(id){if(plots[id]){plots[id].destroy();delete plots[id]}}
+function makePlot(id,payload,seriesOptions={}){
+  let el=$(id);destroyPlot(id);if(!el||!payload.timestamps?.length)return null;
+  let keys=Object.keys(payload.series), c=colors(), palette=[c.accent,c.a,c.b,c.c,c.warn,c.muted];
+  let series=[{}].concat(keys.map((key,index)=>({label:payload.meta?.[key]?.label||key,stroke:seriesOptions.colors?.[index]||palette[index%palette.length],width:2,
+    fill:seriesOptions.fill&&index===0?palette[index%palette.length]+'22':undefined,spanGaps:false,points:{show:false},
+    paths:seriesOptions.bars?uPlot.paths.bars({size:[index?0.8:0.5,100]}):undefined,
+    value:(_u,v)=>v==null?'—':`${fmt(v,seriesOptions.decimals??2)} ${payload.meta?.[key]?.unit||''}`.trim()})));
+  let values=[].concat(...keys.map(k=>payload.series[k])).filter(v=>v!=null),zero=seriesOptions.zero===true;
+  let options={width:Math.max(280,el.clientWidth),height:plotHeight(el),tzDate:ts=>uPlot.tzDate(new Date(ts*1000),'Asia/Jakarta'),
+    series,scales:{x:{time:true},y:{range:(_u,min,max)=>{if(!Number.isFinite(min)||!Number.isFinite(max))return [0,1];if(zero)min=Math.min(0,min);let pad=Math.max((max-min)*.08,Math.abs(max||1)*.01);return [zero?Math.max(0,min-pad):min-pad,max+pad]}}},
+    axes:[{stroke:c.muted,grid:{stroke:c.grid,width:1},ticks:{stroke:c.grid}},{stroke:c.muted,grid:{stroke:c.grid,width:1},ticks:{stroke:c.grid},label:seriesOptions.unit||payload.meta?.[keys[0]]?.unit||'',labelSize:18}],
+    legend:{show:true},cursor:{drag:{x:true,y:false,setScale:true}},select:{show:true}};
+  let chart=new uPlot(options,[payload.timestamps,...keys.map(k=>payload.series[k])],el);plots[id]=chart;chart._full=[payload.timestamps[0],payload.timestamps.at(-1)];return chart;
+}
+function resizePlots(){Object.entries(plots).forEach(([id,plot])=>{let el=$(id);if(el&&el.clientWidth>0)plot.setSize({width:el.clientWidth,height:plotHeight(el)})})}
+let resizeTimer;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resizePlots,120)});
+document.addEventListener('click',event=>{let id=event.target.dataset?.reset;if(id&&plots[id])plots[id].setScale('x',{min:plots[id]._full[0],max:plots[id]._full[1]})});
+
+function healthItem(label,value,state=''){return `<div class="trust-item"><span>${label}</span><b class="${state}">${value}</b></div>`}
+function phaseTable(v){return `<div class="phase-table">${[['A',v.voltage_l1,v.current_a],['B',v.voltage_l2,v.current_b],['C',v.voltage_l3,v.current_c]].map(x=>`<div class="phase-line"><b>${x[0]}</b><span>${fmt(x[1])} <small>V</small></span><span>${fmt(x[2])} <small>A</small></span></div>`).join('')}</div>`}
+function renderLive(){
+  let p=liveData,v=p.values||{},state=stateWord(p.state),status=$('status');status.textContent=state;status.className='status '+stateClass(state);
+  let banner=$('overview-banner');banner.className='state-banner '+stateClass(state);banner.innerHTML=`<strong>${state}</strong><span>${state==='LIVE'?'Accepted telemetry is current.':state==='STALE'?'Last accepted telemetry is older than 5 seconds.':state==='ERROR'?'Collector is reachable but the meter read is failing.':state==='OFFLINE'?'Production API is unreachable.':'Telemetry state cannot be established.'}</span>`;
+  $('now-power').textContent=fmt(v.active_power_kw);$('overview-phases').innerHTML=phaseTable(v);
+  $('overview-quick').innerHTML=row('Power factor',fmt(v.power_factor,3))+row('Frequency',fmt(v.frequency)+' Hz')+row('Sample age',age(liveData.age_seconds))+row('Highest current',phaseHigh(v));
+  let recorder=p.recorder||{},persist=stateWord((p.persistence||{}).status),meter=p.serial_ok===true?'HEALTHY':state;
+  $('trust-strip').innerHTML=healthItem('METER / COLLECTOR',meter,meter==='HEALTHY'?'good':'bad')+healthItem('RECORDER',persist,persist==='OK'?'good':'bad')+healthItem('DATABASE ROW',recorder.status||'UNKNOWN',recorder.status==='HEALTHY'?'good':'bad')+healthItem('LAST DB WRITE',age(recorder.last_row_age_seconds)+' ago',recorder.last_row_age_seconds<=GAP?'good':'warn');
+  $('energy-counters').innerHTML=[['Active import',v.energy_kwh,'kWh'],['Reactive import',v.reactive_energy_kvarh,'kvarh'],['Apparent import',v.apparent_energy_kvah,'kVAh']].map(x=>`<div><span>${x[0]}</span><b>${fmt(x[1])} ${x[2]}</b></div>`).join('');
+  renderElectricalMatrix(v);renderDiagnostics();
+}
+const GAP=20;
+function phaseHigh(v){let values=[v.current_a,v.current_b,v.current_c].map(numeric);if(values.some(x=>x==null))return '—';let i=values.indexOf(Math.max(...values));return `${'ABC'[i]} · ${fmt(values[i])} A`}
+function renderElectricalMatrix(v){
+  let measures=[['Voltage','V',[v.voltage_l1,v.voltage_l2,v.voltage_l3],null],['Current','A',[v.current_a,v.current_b,v.current_c],null],['Active power','kW',[v.active_power_a_kw,v.active_power_b_kw,v.active_power_c_kw],v.active_power_kw],['Reactive power','kvar',[v.reactive_power_a_kvar,v.reactive_power_b_kvar,v.reactive_power_c_kvar],v.reactive_power_kvar],['Apparent power','kVA',[v.apparent_power_a_kva,v.apparent_power_b_kva,v.apparent_power_c_kva],v.apparent_power_kva],['Power factor','',[v.power_factor_a,v.power_factor_b,v.power_factor_c],v.power_factor],['Frequency','Hz',[null,null,null],v.frequency]];
+  $('electrical-matrix').innerHTML=measures.map(m=>`<tr><th>${m[0]} <small>${m[1]}</small></th>${m[2].map(x=>`<td>${fmt(x,m[0]==='Power factor'?3:2)}</td>`).join('')}<td>${fmt(m[3],m[0]==='Power factor'?3:2)}</td><td>DOCUMENTED + VERIFIED</td></tr>`).join('');
+  let vs=[v.voltage_l1,v.voltage_l2,v.voltage_l3],cs=[v.current_a,v.current_b,v.current_c],ps=[v.active_power_a_kw,v.active_power_b_kw,v.active_power_c_kw],pOverS=numeric(v.apparent_power_kva)?numeric(v.active_power_kw)/numeric(v.apparent_power_kva):null;
+  $('derived-strip').innerHTML=[['Voltage spread',pct(spread(vs))],['Current spread',pct(spread(cs))],['Voltage avg',fmt(avg(vs))+' V'],['Current avg',fmt(avg(cs))+' A'],['P / S check',fmt(pOverS,3)]].map(x=>`<div><span>${x[0]} · DERIVED</span><b>${x[1]}</b></div>`).join('');
+  let max=Math.max(1,...ps.map(numeric).filter(x=>x!=null));$('phase-power-bars').innerHTML=ps.map((value,i)=>`<div class="phase-bar"><b>Phase ${'ABC'[i]}</b><span><i style="width:${(numeric(value)||0)/max*100}%"></i></span><strong>${fmt(value)} kW</strong></div>`).join('');
+  $('electrical-age').textContent=`Latest accepted sample ${age(liveData.age_seconds)} ago`;
 }
 
-async function live(){
-  try{liveData=await fetch('/api/live',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()})}
-  catch(e){liveData={state:'OFFLINE',values:{},persistence:{},diag:{},error:String(e)}}
-  let p=liveData,v=p.values||{},status=$('status'); status.textContent=stateWord(p.state); status.className='status '+String(p.state||'offline').toLowerCase();
-  $('overview-age').textContent='Latest reading '+age(p.age_seconds)+' ago'; $('energy-overview').textContent=fmt(v.energy_kwh)+' kWh'; $('overview-phases').innerHTML=phaseMatrix(v);
-  let vs=[v.voltage_l1,v.voltage_l2,v.voltage_l3],cs=[v.current_a,v.current_b,v.current_c],hi=cs.map(num).some(x=>x!=null)?cs.map(num).indexOf(Math.max(...cs.map(num).filter(x=>x!=null))):null;
-  $('voltage').innerHTML=metric('L1',fmt(vs[0]),'V')+metric('L2',fmt(vs[1]),'V')+metric('L3',fmt(vs[2]),'V')+metric('Average',fmt(avg(vs)),'V')+metric('Spread',pct(imbalance(vs)));
-  $('current').innerHTML=metric('A',fmt(cs[0]),'A')+metric('B',fmt(cs[1]),'A')+metric('C',fmt(cs[2]),'A')+metric('Average',fmt(avg(cs)),'A')+metric('Highest',hi==null?'—':'Phase '+['A','B','C'][hi],hi==null?'':fmt(cs[hi])+' A');
-  renderHealth(); if(loaded.energy)buildInsights();
-}
+async function live(){try{liveData=await api('/api/live')}catch(error){liveData={state:'OFFLINE',values:{},recorder:{status:'ERROR'},error:String(error)}}renderLive()}
+async function history(range,metrics,extra=''){return api(`/api/history?range=${range}&metrics=${metrics}${extra}`)}
+async function energyRange(from,to,span){let suffix=span?`&start=${encodeURIComponent(span[0])}&end=${encodeURIComponent(span[1])}`:'';return api(`/api/energy?from=${from}&to=${to}${suffix}`)}
 
-function renderHealth(){
-  let p=liveData, q=energyData.quality||{}, persistence=stateWord((p.persistence||{}).status), healthy=persistence==='OK'?'HEALTHY':persistence;
-  $('overview-health').innerHTML=row('Meter / RS485',p.serial_ok?'HEALTHY':stateWord(p.state),p.serial_ok?'ok':'bad')+row('Latest reading',age(p.age_seconds)+' ago')+row('Persistence',healthy,healthy==='HEALTHY'?'ok':'warn')+row('Coverage today',pct(q.coverage),q.coverage>=80?'ok':'warn');
-  $('system-monitoring').innerHTML=row('Meter',p.serial_ok?'HEALTHY':stateWord(p.state))+row('RS485 / serial',p.serial_ok?'HEALTHY':'OFFLINE')+row('Latest reading',age(p.age_seconds)+' ago')+row('Freshness',stateWord(p.state));
-  $('system-data').innerHTML=row('Persistence',persistence)+row('Database / API',persistence==='OK'?'HEALTHY':'UNAVAILABLE')+row('Latest accepted record',p.timestamp?new Date(p.timestamp).toLocaleString():'UNAVAILABLE')+row('Coverage today',pct(q.coverage));
-  let d=p.diag||{}, pick=(...keys)=>{for(let k of keys)if(d[k]!=null)return d[k];return 'UNAVAILABLE'};
-  $('system-quality').innerHTML=row('Current gap',q.current_gap?'YES':'NO')+row('CRC errors',pick('crc_errors','crc_error_count'))+row('Timeouts',pick('timeouts','timeout_count'))+row('Reopens',pick('reopens','reopen_count'));
-  $('system-service').innerHTML=row('Dashboard API','HEALTHY')+row('Production data API',p.error?'ERROR':'HEALTHY')+row('Live state',stateWord(p.state))+row('Reporting rows',energyData.rows??'—');
-  $('system-updated').textContent='Updated '+new Date().toLocaleTimeString(); $('engineering-diag').textContent=`timestamp: ${p.timestamp||'unavailable'}\nserial: ${p.serial_ok?'healthy':'unavailable'}\npersistence: ${persistence}`;
-}
-
-function setDates(kind){
-  let now=new Date(),start=new Date(now),end=addDays(now,1);
-  if(kind==='yesterday'){start=addDays(now,-1);end=now}
-  if(kind==='7d')start=addDays(now,-6);
-  if(kind==='month')start=new Date(now.getFullYear(),now.getMonth(),1);
-  if(kind==='prev'){start=new Date(now.getFullYear(),now.getMonth()-1,1);end=new Date(now.getFullYear(),now.getMonth(),1)}
-  $('from').value=ymd(start); $('to').value=ymd(end);
-}
-async function history(from,to){let r=await fetch(`/api/energy?from=${from}&to=${to}`,{cache:'no-store'});if(!r.ok)throw Error(await r.text());return r.json()}
-
-function buildInsights(){
-  let p=liveData,q=energyData.quality||{},items=[];
-  if(p.state!=='LIVE')items.push(`${stateWord(p.state)} · the latest accepted reading is ${age(p.age_seconds)} old.`);
-  if(q.coverage!=null&&q.coverage<80)items.push(`Monitoring coverage today is ${pct(q.coverage)}; the displayed total is partial.`);
-  if(q.gap_count)items.push(`${q.gap_count} monitoring gap${q.gap_count===1?'':'s'} detected; longest ${duration(q.longest_gap_seconds)}.`);
-  let dom=electricalData&&electricalData.phase_dominance_60m;if(dom&&dom.percent>=50)items.push(`Phase ${dom.phase} carried the highest current for ${fmt(dom.percent,0)}% of the last 60 minutes.`);
-  let peak=energyData.peak;if(peak)items.push(`Peak accepted energy use was ${fmt(peak.energy_kwh)} kWh during ${peak.label}.`);
-  if(!items.length)items.push('No notable change in the available period.');
-  $('insights').innerHTML=items.slice(0,4).map(x=>`<li>${x}</li>`).join('');
-}
-
+function renderEvents(target,quality){let gaps=quality?.gaps||[];if(!gaps.length){$(target).innerHTML='<div class="good">No cadence gap detected in this range.</div>';return}$(target).innerHTML=`<div class="event-list">${gaps.slice(-4).reverse().map(g=>`<div class="event"><b>COMMUNICATION · DATA GAP</b><small>${localTime(g.start)} → ${localTime(g.end)} · ${age((new Date(g.end)-new Date(g.start))/1000)}</small></div>`).join('')}</div>`}
 async function loadOverview(){
-  let now=new Date(),today=ymd(now),tomorrow=ymd(addDays(now,1));
-  try{energyData=await history(today,tomorrow);loaded.energy=true}catch(e){energyData={error:String(e),quality:{}}}
-  let p=energyData,q=p.quality||{};$('today-total').textContent=p.total_kwh==null?'UNAVAILABLE':fmt(p.total_kwh);
-  $('today-demand').textContent=p.average_demand_kw==null?'WITHHELD':fmt(p.average_demand_kw)+' kW'; $('today-coverage').textContent=pct(q.coverage);
-  $('today-note').textContent=p.error?p.error:(q.coverage<80?'PARTIAL · accepted records do not cover the full day':'Counter-continuous accepted energy');
-  let bs=p.buckets||[],complete=bs.filter(x=>!x.partial),peak=p.peak,current=bs.at(-1),previous=bs.at(-2);
-  $('recent-context').innerHTML=row('Current hour',current?fmt(current.energy_kwh)+' kWh'+(current.partial?' · PARTIAL':''):'UNAVAILABLE')+row('Previous hour',previous?fmt(previous.energy_kwh)+' kWh'+(previous.partial?' · PARTIAL':''):'UNAVAILABLE')+row('Peak complete hour',peak?peak.label+' · '+fmt(peak.energy_kwh)+' kWh':'UNAVAILABLE')+row('Valid samples',p.rows??0);
-  $('today-delta').textContent='Loading…'; renderEnergy(); renderHealth(); buildInsights();
-  try{let y=addDays(now,-1),prior=await history(ymd(y),today);$('today-delta').textContent=comparisonText(p,prior)}catch(_){$('today-delta').textContent='UNAVAILABLE'}
+  try{let power=await history('24h','active_power_kw');makePlot('overview-power',power,{zero:true,fill:true,unit:'kW'});let q=power.quality||{};$('overview-power-state').textContent=`${power.rows} accepted samples · ${pct(q.coverage)} coverage · ${q.gap_count} gap${q.gap_count===1?'':'s'}`;let peak=power.summary?.active_power_kw;$('overview-peak').innerHTML=peak?`${fmt(peak.max)} kW<small>${localTime(peak.peak_timestamp)} · accepted interval average</small>`:'UNAVAILABLE';renderEvents('overview-events',q)}catch(error){$('overview-power-state').textContent='HISTORY UNAVAILABLE · live telemetry remains independent.'}
+  let now=new Date(),today=ymd(now),tomorrow=ymd(addDays(now,1)),midnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()),priorStart=addDays(midnight,-1),priorEnd=new Date(priorStart.getTime()+(now-midnight));
+  try{let [current,prior]=await Promise.all([energyRange(today,tomorrow),energyRange(ymd(priorStart),today,[priorStart.toISOString(),priorEnd.toISOString()])]);energy.today=current;energy.yesterday=prior;$('today-energy').textContent=fmt(current.total_kwh);$('energy-note').textContent=current.quality?.coverage>=80?'Accepted counter delta':`PARTIAL · ${pct(current.quality?.coverage)} coverage`;$('overview-compare').innerHTML=comparison(current,prior,'Today','Yesterday · same time')}catch(error){$('today-energy').textContent='—';$('energy-note').textContent='HISTORY UNAVAILABLE';$('overview-compare').textContent='UNAVAILABLE'}
+  loaded.overview=true;
 }
-
-function renderEnergy(){
-  let p=energyData,q=p.quality||{};$('total').textContent=p.total_kwh==null?'UNAVAILABLE':fmt(p.total_kwh);$('period-demand').textContent=p.average_demand_kw==null?'WITHHELD':fmt(p.average_demand_kw);
-  $('peak-period').textContent=p.peak?p.peak.label:'UNAVAILABLE';$('peak-value').textContent=p.peak?fmt(p.peak.energy_kwh)+' kWh':'No complete bucket';$('coverage').textContent=pct(q.coverage);$('coverage-state').textContent=q.coverage>=80?'COMPLETE ENOUGH':'PARTIAL';
-  $('quality').textContent=p.error||p.broken?'Counter continuity failed; total withheld.':p.truncated?'PARTIAL · reporting row limit reached.':`${p.rows||0} accepted samples · expected cadence ${q.expected_cadence_seconds||'—'} s.`;
-  $('chart-title').textContent=(p.aggregation==='hour'?'Hourly':p.aggregation==='day'?'Daily':'Weekly')+' energy use';drawBars(p.buckets||[]);drawAvailability(p);
-}
-
-function drawBars(buckets){
-  let svg=$('chart'),empty=$('chart-empty');if(!buckets.length){svg.innerHTML='';svg.classList.add('hidden');empty.classList.remove('hidden');empty.textContent='UNAVAILABLE · No accepted energy samples in this period.';return}
-  svg.classList.remove('hidden');empty.classList.add('hidden');let values=buckets.map(b=>num(b.energy_kwh)).filter(v=>v!=null),max=Math.max(1,...values),left=72,top=22,bottom=52,plotH=250,plotW=850;
-  let ticks=[0,max/4,max/2,max*3/4,max],grid=ticks.map((v,i)=>{let y=top+plotH-(v/max*plotH);return `<line x1="${left}" y1="${y}" x2="${left+plotW}" y2="${y}"/><text x="${left-10}" y="${y+4}" text-anchor="end">${fmt(v,1)}</text>`}).join('');
-  let step=Math.min(72,plotW/Math.max(1,buckets.length)),width=Math.min(38,step*.62),usedWidth=step*buckets.length,x0=left+(buckets.length<10?(plotW-usedWidth)/2:0);
-  let every=Math.max(1,Math.ceil(buckets.length/10));let bars=buckets.map((b,i)=>{let v=num(b.energy_kwh),x=x0+i*step+(step-width)/2,h=v==null?0:v/max*plotH,y=top+plotH-h,label=i%every===0||i===buckets.length-1?`<text x="${x+width/2}" y="${top+plotH+24}" text-anchor="middle">${b.label}</text>`:'';
-    return `<g><rect class="bar ${b.partial?'partial':''}" tabindex="0" role="img" aria-label="${b.label}: ${v==null?'missing':fmt(v,3)+' kilowatt hours'}, coverage ${pct(b.coverage)}" x="${x}" y="${y}" width="${width}" height="${Math.max(h,v===0?1:0)}"><title>${b.label} · ${v==null?'missing':fmt(v,3)+' kWh'} · ${pct(b.coverage)} coverage${b.partial?' · partial':''}</title></rect>${v==null?`<line class="missing" x1="${x}" y1="${top+plotH-4}" x2="${x+width}" y2="${top+plotH-4}"/>`:''}${label}</g>`}).join('');
-  svg.innerHTML=`<g class="gridlines">${grid}</g><text class="axis-title" transform="translate(16 ${top+plotH/2}) rotate(-90)" text-anchor="middle">Energy use (kWh)</text>${bars}<line class="baseline" x1="${left}" y1="${top+plotH}" x2="${left+plotW}" y2="${top+plotH}"/>`;
-}
-
-function drawAvailability(p){
-  let q=p.quality||{},bar=$('availability-bar');bar.innerHTML='';bar.className='availability-bar '+(q.coverage>=80?'good':'partial');
-  let start=new Date(p.from+'T00:00:00+07:00'),end=new Date(p.to+'T00:00:00+07:00'),span=end-start;
-  (q.gaps||[]).forEach(g=>{let a=Math.max(0,(new Date(g.start)-start)/span*100),b=Math.min(100,(new Date(g.end)-start)/span*100);let el=document.createElement('i');el.style.left=a+'%';el.style.width=Math.max(.4,b-a)+'%';bar.appendChild(el)});
-  $('availability-copy').textContent=`${pct(q.coverage)} coverage · ${q.gap_count||0} gap${q.gap_count===1?'':'s'}`;
-  $('gap-summary').textContent=q.gap_count?`Longest gap ${duration(q.longest_gap_seconds)}${q.current_gap?' · monitoring is currently in a gap':''}.`:'No cadence gap detected in available records.';
-}
-
-async function loadEnergy(){
-  $('quality').textContent='Loading bounded report…';try{energyData=await history($('from').value,$('to').value);renderEnergy()}catch(e){$('quality').textContent='ERROR · '+e.message;$('chart').innerHTML=''}
-}
-
-function lineChart(id,buckets,key){
-  let svg=$(id);if(!buckets.length){svg.innerHTML='<text x="20" y="75">UNAVAILABLE · insufficient history</text>';return}
-  let lines=[0,1,2].map(phase=>buckets.map(b=>b[key][phase])),all=lines.flat(),min=Math.min(...all),max=Math.max(...all),colors=['phase1','phase2','phase3'];
-  svg.innerHTML='<g class="mini-grid"><line x1="42" y1="20" x2="625" y2="20"/><line x1="42" y1="125" x2="625" y2="125"/></g>'+lines.map((values,p)=>`<polyline class="${colors[p]}" points="${values.map((v,i)=>`${42+i/(values.length-1||1)*583},${125-(v-min)/(max-min||1)*105}`).join(' ')}"><title>Phase ${p+1}</title></polyline>`).join('')+`<text x="4" y="25">${fmt(max,1)}</text><text x="4" y="128">${fmt(min,1)}</text><text x="42" y="145">−60 min</text><text x="625" y="145" text-anchor="end">now</text>`;
-}
+function comparison(a,b,aLabel,bLabel){let valid=a?.total_kwh!=null&&b?.total_kwh!=null&&a.quality?.coverage>=80&&b.quality?.coverage>=80;if(!valid)return `<div class="warn">UNAVAILABLE FOR RELIABLE COMPARISON</div><p class="fine">${aLabel} ${pct(a?.quality?.coverage)} · ${bLabel} ${pct(b?.quality?.coverage)}</p>`;let delta=a.total_kwh-b.total_kwh,change=b.total_kwh?delta/b.total_kwh*100:null;return `<div class="big-context">${delta>=0?'+':''}${fmt(delta)} kWh<small>${change==null?'No percentage baseline':(change>=0?'+':'')+fmt(change,1)+'%'} · ${aLabel} ${fmt(a.total_kwh)} / ${bLabel} ${fmt(b.total_kwh)}</small></div>`}
 
 async function loadElectrical(){
-  if(loaded.electrical)return;loaded.electrical=true;
-  try{electricalData=await fetch('/api/electrical-history',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()});let h=electricalData.last_hour,t=electricalData.today;
-    lineChart('voltage-trend',electricalData.buckets||[],'v');lineChart('current-trend',electricalData.buckets||[],'i');
-    $('voltage-context').innerHTML=metric('60m min / max',h?fmt(h.voltage.min)+' / '+fmt(h.voltage.max):'—','V')+metric('Today min / max',t?fmt(t.voltage.min)+' / '+fmt(t.voltage.max):'—','V')+metric('Today average',t?fmt(t.voltage.average):'—','V')+metric('Peak spread',t?pct(t.voltage_imbalance.peak):'—',t?when(t.voltage_imbalance.time):'');
-    $('current-context').innerHTML=metric('60m min / max',h?fmt(h.current.min)+' / '+fmt(h.current.max):'—','A')+metric('Today min / max',t?fmt(t.current.min)+' / '+fmt(t.current.max):'—','A')+metric('Today average',t?fmt(t.current.average):'—','A')+metric('Today peak',t?fmt(t.peak_current.value):'—',t?'Phase '+t.peak_current.phase+' · '+when(t.peak_current.time):'');
-    let vs=[liveData.values?.voltage_l1,liveData.values?.voltage_l2,liveData.values?.voltage_l3],cs=[liveData.values?.current_a,liveData.values?.current_b,liveData.values?.current_c];
-    $('imbalance-context').innerHTML=metric('Voltage now',pct(imbalance(vs)))+metric('Voltage 1h median',h?pct(h.voltage_imbalance.median):'—')+metric('Current now',pct(imbalance(cs)))+metric('Current 1h median',h?pct(h.current_imbalance.median):'—');buildInsights();
-  }catch(e){loaded.electrical=false;$('imbalance-context').textContent='UNAVAILABLE · '+e.message}
+  try{let [vi,pf,freq]=await Promise.all([history('24h','voltage_l1,voltage_l2,voltage_l3,current_a,current_b,current_c'),history('24h','power_factor'),history('24h','frequency')]);let voltage={...vi,series:{voltage_l1:vi.series.voltage_l1,voltage_l2:vi.series.voltage_l2,voltage_l3:vi.series.voltage_l3}},current={...vi,series:{current_a:vi.series.current_a,current_b:vi.series.current_b,current_c:vi.series.current_c}};makePlot('voltage-chart',voltage,{colors:[colors().a,colors().b,colors().c],unit:'V'});makePlot('current-chart',current,{colors:[colors().a,colors().b,colors().c],zero:true,unit:'A'});makePlot('pf-chart',pf,{unit:''});makePlot('frequency-chart',freq,{unit:'Hz'});loaded.electrical=true}catch(error){['voltage-chart','current-chart','pf-chart','frequency-chart'].forEach(id=>$(id).textContent='HISTORY UNAVAILABLE')}
 }
 
-function comparisonText(a,b){let qa=a.quality?.coverage||0,qb=b.quality?.coverage||0;if(a.total_kwh==null||b.total_kwh==null||qa<80||qb<80)return 'UNAVAILABLE';let delta=a.total_kwh-b.total_kwh;return `${delta>=0?'+':''}${fmt(delta)} kWh · ${b.total_kwh?fmt(delta/b.total_kwh*100,1)+'%':'no baseline'}`}
-function comparisonCard(a,b){let qa=a.quality?.coverage||0,qb=b.quality?.coverage||0,valid=a.total_kwh!=null&&b.total_kwh!=null&&qa>=80&&qb>=80;
-  if(!valid)return `<div class="unavailable"><b>UNAVAILABLE FOR RELIABLE COMPARISON</b><p>Current coverage ${pct(qa)} · previous coverage ${pct(qb)}</p><small>${a.total_kwh==null||b.total_kwh==null?'Insufficient accepted energy history.':'One or both periods are below 80% coverage.'}</small></div>`;
-  let delta=a.total_kwh-b.total_kwh,change=b.total_kwh?delta/b.total_kwh*100:null,max=Math.max(a.total_kwh,b.total_kwh,1);return `<div class="compare-values"><div><span>Current</span><b>${fmt(a.total_kwh)} kWh</b><i style="width:${a.total_kwh/max*100}%"></i></div><div><span>Previous</span><b>${fmt(b.total_kwh)} kWh</b><i style="width:${b.total_kwh/max*100}%"></i></div></div><p>${delta>=0?'+':''}${fmt(delta)} kWh · ${change==null?'no percentage baseline':(change>=0?'+':'')+fmt(change,1)+'%'}</p><small>Coverage ${pct(qa)} / ${pct(qb)}</small>`}
-async function loadCompare(){
-  if(loaded.compare)return;loaded.compare=true;let now=new Date(),today=ymd(now),tomorrow=ymd(addDays(now,1)),yesterday=ymd(addDays(now,-1));let monday=addDays(now,-((now.getDay()+6)%7)),month=new Date(now.getFullYear(),now.getMonth(),1);let elapsedDays=Math.max(1,Math.round((new Date(tomorrow)-month)/86400000));
-  try{let [td,yd,w,pw,m,pm]=await Promise.all([history(today,tomorrow),history(yesterday,today),history(ymd(monday),tomorrow),history(ymd(addDays(monday,-7)),ymd(monday)),history(ymd(month),tomorrow),history(ymd(addDays(month,-elapsedDays)),ymd(month))]);$('cmp-day').innerHTML=comparisonCard(td,yd);$('cmp-week').innerHTML=comparisonCard(w,pw);$('cmp-month').innerHTML=comparisonCard(m,pm)}catch(e){$('compare-grid').innerHTML=`<article class="unavailable">ERROR · ${e.message}</article>`}
+function energyPayload(buckets,label){return {timestamps:buckets.map(b=>new Date(b.start).getTime()/1000),series:{value:buckets.map(b=>b.energy_kwh)},meta:{value:{label,unit:'kWh'}}}}
+function hourlyComparePayload(today,yesterday){let buckets=today.buckets||[],prior=new Map((yesterday.buckets||[]).map(b=>[new Date(b.start).getHours(),b.energy_kwh]));return {timestamps:buckets.map(b=>new Date(b.start).getTime()/1000),series:{today:buckets.map(b=>b.energy_kwh),yesterday:buckets.map(b=>prior.get(new Date(b.start).getHours())??null)},meta:{today:{label:'Today',unit:'kWh'},yesterday:{label:'Yesterday · same time',unit:'kWh'}}}}
+function comparisonRow(name,a,b){let result=comparison(a,b,'Current','Previous');return `<div class="comparison-row"><b>${name}</b><span>${a?.total_kwh==null?'—':fmt(a.total_kwh)+' kWh'}</span><small>${result.replace(/<[^>]+>/g,' ')}</small></div>`}
+async function loadEnergy(){
+  let now=new Date(),today=ymd(now),tomorrow=ymd(addDays(now,1)),d7=ymd(addDays(now,-6)),d30=ymd(addDays(now,-29)),monday=addDays(now,-((now.getDay()+6)%7)),month=new Date(now.getFullYear(),now.getMonth(),1),prevMonth=new Date(now.getFullYear(),now.getMonth()-1,1),midnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()),priorStart=addDays(midnight,-1),priorEnd=new Date(priorStart.getTime()+(now-midnight));
+  try{let [td,yd,week,prevWeek,monthNow,monthPrev,last7,last30]=await Promise.all([energyRange(today,tomorrow),energyRange(ymd(priorStart),today,[priorStart.toISOString(),priorEnd.toISOString()]),energyRange(ymd(monday),tomorrow),energyRange(ymd(addDays(monday,-7)),ymd(monday)),energyRange(ymd(month),tomorrow),energyRange(ymd(prevMonth),ymd(month)),energyRange(d7,tomorrow),energyRange(d30,tomorrow)]);energy={today:td,yesterday:yd,week,prevWeek,month:monthNow,prevMonth,last7,last30};let complete7=(last7.buckets||[]).filter(b=>!b.partial&&b.energy_kwh!=null),complete30=(last30.buckets||[]).filter(b=>!b.partial&&b.energy_kwh!=null);let avg7=complete7.length?avg(complete7.map(b=>b.energy_kwh)):null,avg30=complete30.length?avg(complete30.map(b=>b.energy_kwh)):null;
+    $('energy-kpis').innerHTML=[['Today',td.total_kwh,'kWh'],['Yesterday · same time',yd.total_kwh,'kWh'],['Difference',td.total_kwh!=null&&yd.total_kwh!=null?td.total_kwh-yd.total_kwh:null,'kWh'],['7-day avg',avg7,'kWh/day'],['30-day avg',avg30,'kWh/day']].map(x=>`<div class="energy-kpi"><span>${x[0]}</span><b>${fmt(x[1])}</b><small>${x[2]}</small></div>`).join('');
+    $('energy-quality').textContent=`Today: ${pct(td.quality?.coverage)} coverage · ${td.quality?.gap_count||0} cadence gaps · comparisons withheld below 80%.`;
+    makePlot('hourly-energy',hourlyComparePayload(td,yd),{bars:true,zero:true,unit:'kWh',colors:[colors().accent,colors().muted]});makePlot('daily-energy',energyPayload(last30.buckets||[],'Daily energy'),{bars:true,zero:true,unit:'kWh'});
+    $('energy-comparisons').innerHTML=comparisonRow('Today vs yesterday',td,yd)+comparisonRow('Week vs previous week',week,prevWeek)+comparisonRow('Month vs previous month',monthNow,monthPrev);loaded.energy=true;
+  }catch(error){$('energy-quality').textContent='HISTORY UNAVAILABLE · '+error.message}
 }
 
-document.querySelectorAll('.tab').forEach(button=>button.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button));document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));$(button.dataset.view==='energy'?'energy-view':button.dataset.view).classList.remove('hidden');if(button.dataset.view==='live')loadElectrical();if(button.dataset.view==='energy')loadEnergy();if(button.dataset.view==='compare')loadCompare()});
-$('preset').onchange=e=>{if(e.target.value!=='custom')setDates(e.target.value)};$('load').onclick=loadEnergy;
-$('theme').onclick=()=>{document.body.classList.toggle('light');let light=document.body.classList.contains('light');$('theme').textContent=light?'DARK':'LIGHT';localStorage.setItem('fcn-theme',light?'light':'dark')};if(localStorage.getItem('fcn-theme')==='light')$('theme').click();
-const sig=$('signature');if(!matchMedia('(prefers-reduced-motion: reduce)').matches){let target='Made by iw3',chars='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#%+-/:',start=performance.now();function reveal(t){let n=Math.min(target.length,Math.floor((t-start)/80));sig.textContent=target.split('').map((c,i)=>i<n?c:chars[Math.floor(Math.random()*chars.length)]).join('');if(n<target.length)requestAnimationFrame(reveal);else sig.textContent=target}sig.textContent='';requestAnimationFrame(reveal)}
-const query=new URLSearchParams(location.search);if(query.get('theme')==='light'){document.body.classList.add('light');$('theme').textContent='DARK'}else if(query.get('theme')==='dark'){document.body.classList.remove('light');$('theme').textContent='LIGHT'}
-let initialPeriod=query.get('period')||'today';if([...$('preset').options].some(x=>x.value===initialPeriod))$('preset').value=initialPeriod;setDates(initialPeriod);
-live();loadOverview();let initialView=query.get('view');if(initialView)document.querySelector(`.tab[data-view="${initialView}"]`)?.click();setInterval(live,2000);
+function metricFields(value){return value==='voltage'?'voltage_l1,voltage_l2,voltage_l3':value==='current'?'current_a,current_b,current_c':value}
+function shiftedComparison(current,prior,label){let keys=Object.keys(current.series),shift=(new Date(current.from)-new Date(prior.from))/1000,result={...current,series:{},meta:{...current.meta}};keys.forEach(k=>result.series[k]=current.series[k]);let priorKey=keys[0],shifted=new Array(current.timestamps.length).fill(null);(prior.timestamps||[]).forEach((t,i)=>{let target=t+shift,index=current.timestamps.findIndex(x=>Math.abs(x-target)<=current.bucket_seconds/2);if(index>=0)shifted[index]=prior.series[priorKey][i]});result.series[priorKey+'__compare']=shifted;result.meta[priorKey+'__compare']={label,unit:current.meta[priorKey].unit};return result}
+async function loadHistory(){
+  let range=$('history-range').value,metric=$('history-metric').value,fields=metricFields(metric),extra='';if(range==='custom'){let from=$('history-from').value,to=$('history-to').value;if(!from||!to){$('history-state').textContent='Choose both custom dates.';return}extra=`&from=${encodeURIComponent(new Date(from).toISOString())}&to=${encodeURIComponent(new Date(to).toISOString())}`}
+  $('history-state').textContent='Loading bounded history…';try{let data=await history(range,fields,extra),compare=$('history-compare').value;if(compare!=='none'&&Object.keys(data.series).length===1){let delta=compare==='yesterday'?86400000:compare==='previous-week'?7*86400000:30*86400000,start=new Date(data.from).getTime()-delta,end=new Date(data.to).getTime()-delta;let prior=await history('custom',fields,`&from=${encodeURIComponent(new Date(start).toISOString())}&to=${encodeURIComponent(new Date(end).toISOString())}`);data=shiftedComparison(data,prior,compare.replace('-',' '))}makePlot('history-chart',data,{zero:['active_power_kw','reactive_power_kvar','apparent_power_kva','current'].includes(metric),unit:data.meta?.[Object.keys(data.series)[0]]?.unit});let q=data.quality||{};$('history-state').textContent=`${data.rows} accepted samples · ${pct(q.coverage)} coverage · ${data.bucket_seconds}s visualization buckets${data.truncated?' · SOURCE ROW LIMIT REACHED':''}`;let summary=data.summary?.[Object.keys(data.summary)[0]];$('history-summary').innerHTML=row('Minimum',summary?fmt(summary.min):'—')+row('Average',summary?fmt(summary.average):'—')+row('Maximum',summary?fmt(summary.max):'—')+row('Peak time',summary?localTime(summary.peak_timestamp):'—')+row('Aggregation',`${data.bucket_seconds} s`);renderEvents('history-events',q);loaded.history=true}catch(error){$('history-state').textContent='HISTORY ERROR · '+error.message;destroyPlot('history-chart')}
+}
+
+function renderDiagnostics(){let p=liveData,v=p.values||{},r=p.recorder||{},persist=p.persistence||{},d=diag||{},q=energy.today?.quality||{};$('diag-acquisition').innerHTML=row('Meter',p.serial_ok?'HEALTHY':stateWord(p.state),p.serial_ok?'good':'bad')+row('Collector',stateWord(p.state))+row('Poll freshness',age(p.age_seconds)+' ago')+row('Serial ownership','PRODUCTION COLLECTOR ONLY');$('diag-recorder').innerHTML=row('Persistence',stateWord(persist.status),persist.status==='OK'?'good':'bad')+row('Last attempt',persist.last_attempt||'—')+row('Last success',persist.last_success||'—')+row('Latest stored row',age(r.last_row_age_seconds)+' ago')+row('Gap rule',`>${r.gap_rule_seconds||GAP} s`)+row('Write error',persist.error||r.error||'NONE');$('diag-platform').innerHTML=row('ais-energy service',d.services?.['ais-energy.service']||'—')+row('Dashboard service',d.services?.['fcn300-dashboard.service']||'—')+row('PostgreSQL',d.postgres||'—')+row('PostgREST / history API',d.postgrest||'—')+row('Dashboard API',d.dashboard||'HEALTHY')+row('Serial owner PID',d.serial_owner_pids||'—');$('diag-quality').innerHTML=row('Sample quality',stateWord(p.state))+row('Mapping provenance','DOCUMENTED + VERIFIED')+row('Coverage today',pct(q.coverage))+row('Cadence gaps today',q.gap_count??'—')+row('Diagnostics side-channel',p.diag_error?'ERROR':'HEALTHY');let c=v.meter_config||{};$('diag-raw').textContent=`Device: FCN300-POWER-1\nExact physical suffix: pending label confirmation\nCT quantity raw: ${c.ct_quantity_raw??'—'} · UNKNOWN vendor wording\nPT multiplier / divisor: ${c.voltage_multiplier??'—'} / ${c.pt_divisor??'—'}\nCurrent multiplier: ${c.current_multiplier??'—'}\nEffective primary/secondary ratio: ${c.effective_primary_secondary_ratio??'—'}`;$('diagnostics-updated').textContent='Updated '+new Date().toLocaleTimeString()}
+async function loadDiagnostics(){try{diag=await api('/api/diagnostics')}catch(error){diag={error:String(error)}}renderDiagnostics();loaded.diagnostics=true}
+
+document.querySelectorAll('.tab').forEach(button=>button.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button));document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));$(button.dataset.view).classList.remove('hidden');({overview:loadOverview,electrical:loadElectrical,energy:loadEnergy,history:loadHistory,diagnostics:loadDiagnostics}[button.dataset.view])();setTimeout(resizePlots,0)});
+$('history-range').onchange=event=>document.querySelectorAll('.custom-date').forEach(el=>el.classList.toggle('hidden',event.target.value!=='custom'));
+$('history-load').onclick=loadHistory;$('history-metric').onchange=loadHistory;$('history-compare').onchange=loadHistory;
+$('theme').onclick=()=>{document.body.classList.toggle('light');let light=document.body.classList.contains('light');$('theme').textContent=light?'DARK':'LIGHT';localStorage.setItem('fcn-theme',light?'light':'dark');Object.keys(plots).forEach(destroyPlot);loaded={overview:false,electrical:false,energy:false,history:false,diagnostics:false};document.querySelector('.tab.active').click()};
+if(localStorage.getItem('fcn-theme')==='light'){document.body.classList.add('light');$('theme').textContent='DARK'}
+let now=new Date(),before=new Date(now-86400000);$('history-from').value=before.toISOString().slice(0,16);$('history-to').value=now.toISOString().slice(0,16);
+live();loadOverview();setInterval(live,2000);
